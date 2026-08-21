@@ -1,6 +1,6 @@
 {
-  "name": "Ambientika",
-  "filename": "ambientika.zip",
+  "name": "Ambientika Ventilation",
+  "filename": "ambientika_ventilation.zip",
   "render_readme": true,
   "zip_release": true,
   "homeassistant": "2025.6.0"

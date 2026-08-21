@@ -11,7 +11,7 @@ after commands.
 
 Platforms consume immutable combined device/status models. Their entity unique
 IDs use `<serial>_<entity-key>`; device registry identifiers use
-`(ambientika, <serial>)`. These identifiers are compatibility contracts and
+`(ambientika_ventilation, <serial>)`. These identifiers are compatibility contracts and
 must not change after release.
 
 New device serials are detected by platform listeners after coordinator
@@ -26,4 +26,3 @@ It logs neither credentials nor bodies. Diagnostics use redacted identifier
 suffixes and omit user-created names and full cloud payloads. The vendor API
 does not currently offer OAuth/PKCE; this limitation is documented rather than
 hidden behind a custom token scheme.
-

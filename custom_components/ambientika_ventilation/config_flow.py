@@ -65,7 +65,7 @@ class NoDevicesError(AmbientikaApiError):
 class AmbientikaConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle an Ambientika config flow."""
 
-    VERSION = 2
+    VERSION = 1
     MINOR_VERSION = 1
 
     async def async_step_user(
@@ -87,9 +87,11 @@ class AmbientikaConfigFlow(ConfigFlow, domain=DOMAIN):
             except Exception:
                 errors["base"] = "unknown"
             else:
-                await self.async_set_unique_id(f"ambientika_{data[CONF_USER_ID]}")
+                await self.async_set_unique_id(f"{DOMAIN}_{data[CONF_USER_ID]}")
                 self._abort_if_unique_id_configured()
-                return self.async_create_entry(title="Ambientika", data=data)
+                return self.async_create_entry(
+                    title="Ambientika Ventilation", data=data
+                )
 
         return self.async_show_form(
             step_id="user",

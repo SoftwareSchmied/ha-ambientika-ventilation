@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from custom_components.ambientika.api import RequestMetrics
-from custom_components.ambientika.diagnostics import async_get_config_entry_diagnostics
-from custom_components.ambientika.models import (
+from custom_components.ambientika_ventilation.api import RequestMetrics
+from custom_components.ambientika_ventilation.diagnostics import (
+    async_get_config_entry_diagnostics,
+)
+from custom_components.ambientika_ventilation.models import (
     AmbientikaData,
     AmbientikaDevice,
     AmbientikaDeviceData,

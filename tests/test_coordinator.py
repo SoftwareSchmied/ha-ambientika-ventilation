@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-from custom_components.ambientika.const import DOMAIN
-from custom_components.ambientika.coordinator import AmbientikaCoordinator
+from custom_components.ambientika_ventilation.const import DOMAIN
+from custom_components.ambientika_ventilation.coordinator import AmbientikaCoordinator
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 

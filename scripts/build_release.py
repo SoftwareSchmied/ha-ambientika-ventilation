@@ -8,9 +8,9 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "custom_components" / "ambientika"
+SOURCE = ROOT / "custom_components" / "ambientika_ventilation"
 OUTPUT_DIRECTORY = ROOT / "dist"
-OUTPUT = OUTPUT_DIRECTORY / "ambientika.zip"
+OUTPUT = OUTPUT_DIRECTORY / "ambientika_ventilation.zip"
 CHECKSUM = OUTPUT.with_suffix(".zip.sha256")
 FIXED_TIMESTAMP = (2026, 1, 1, 0, 0, 0)
 

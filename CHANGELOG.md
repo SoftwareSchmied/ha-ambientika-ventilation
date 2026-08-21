@@ -10,4 +10,4 @@ All notable changes follow [Semantic Versioning](https://semver.org/).
 - Add fan, sensor, binary sensor, select, and button platforms.
 - Add validated state writes with immediate read-back.
 - Add resilient polling, request metrics, redacted diagnostics, and DE/EN UI.
-- Add migration support for version 1 config entries and compatible entities.
+- Publish under the `ambientika_ventilation` domain as Ambientika Ventilation.

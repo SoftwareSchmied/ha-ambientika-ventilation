@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from custom_components.ambientika.models import parse_houses, parse_status
+from custom_components.ambientika_ventilation.models import parse_houses, parse_status
 
 
 def test_parse_houses_discovers_multiple_shapes(houses_payload) -> None:

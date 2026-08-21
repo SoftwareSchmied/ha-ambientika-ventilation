@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
-from custom_components.ambientika import async_migrate_entry
-from custom_components.ambientika.api import AmbientikaAuthError
-from custom_components.ambientika.const import CONF_USER_ID, DOMAIN
+from custom_components.ambientika_ventilation.api import AmbientikaAuthError
+from custom_components.ambientika_ventilation.const import CONF_USER_ID, DOMAIN
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.data_entry_flow import FlowResultType
@@ -25,11 +24,11 @@ async def test_user_flow_success(hass) -> None:
     }
     with (
         patch(
-            "custom_components.ambientika.config_flow._validate_input",
+            "custom_components.ambientika_ventilation.config_flow._validate_input",
             return_value=data,
         ),
         patch(
-            "custom_components.ambientika.async_setup_entry",
+            "custom_components.ambientika_ventilation.async_setup_entry",
             new=AsyncMock(return_value=True),
         ),
     ):
@@ -40,13 +39,15 @@ async def test_user_flow_success(hass) -> None:
         )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Ambientika Ventilation"
     assert result["data"][CONF_USER_ID] == 42
+    assert result["result"].unique_id == "ambientika_ventilation_42"
 
 
 async def test_user_flow_invalid_auth(hass) -> None:
     """Authentication errors are shown without exposing details."""
     with patch(
-        "custom_components.ambientika.config_flow._validate_input",
+        "custom_components.ambientika_ventilation.config_flow._validate_input",
         side_effect=AmbientikaAuthError,
     ):
         result = await hass.config_entries.flow.async_init(
@@ -63,7 +64,7 @@ async def test_reauthentication_updates_existing_entry(hass) -> None:
     """Reauthentication accepts only credentials for the existing account."""
     entry = MockConfigEntry(
         domain=DOMAIN,
-        unique_id="ambientika_42",
+        unique_id="ambientika_ventilation_42",
         data={
             CONF_USERNAME: "old@example.com",
             CONF_PASSWORD: "old-password",
@@ -80,7 +81,7 @@ async def test_reauthentication_updates_existing_entry(hass) -> None:
         "expires_at": "2099-01-01T00:00:00+00:00",
     }
     with patch(
-        "custom_components.ambientika.config_flow._validate_input",
+        "custom_components.ambientika_ventilation.config_flow._validate_input",
         return_value=new_data,
     ):
         result = await hass.config_entries.flow.async_init(
@@ -99,17 +100,3 @@ async def test_reauthentication_updates_existing_entry(hass) -> None:
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
     assert entry.data["token"] == "renewed"
-
-
-async def test_migrate_legacy_config_entry(hass) -> None:
-    """Version 1 credential entries are retained and upgraded in place."""
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        version=1,
-        data={CONF_USERNAME: "user@example.com", CONF_PASSWORD: "password"},
-    )
-    entry.add_to_hass(hass)
-
-    assert await async_migrate_entry(hass, entry)
-    assert entry.version == 2
-    assert entry.data[CONF_USERNAME] == "user@example.com"

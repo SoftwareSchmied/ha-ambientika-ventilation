@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from custom_components.ambientika.fan import AmbientikaFan
-from custom_components.ambientika.models import (
+from custom_components.ambientika_ventilation.fan import AmbientikaFan
+from custom_components.ambientika_ventilation.models import (
     AmbientikaData,
     AmbientikaDevice,
     AmbientikaDeviceData,
     AmbientikaStatus,
 )
-from custom_components.ambientika.select import SELECTS, AmbientikaSelect
-from custom_components.ambientika.sensor import SENSORS, AmbientikaSensor
+from custom_components.ambientika_ventilation.select import SELECTS, AmbientikaSelect
+from custom_components.ambientika_ventilation.sensor import SENSORS, AmbientikaSensor
 
 SERIAL = "AABBCCDDEEFF"
 
@@ -54,7 +54,7 @@ def test_entity_unique_ids_are_serial_based() -> None:
 
     assert fan.unique_id == f"{SERIAL}_ventilation"
     assert temperature.unique_id == f"{SERIAL}_temperature"
-    assert ("ambientika", SERIAL) in fan.device_info["identifiers"]
+    assert ("ambientika_ventilation", SERIAL) in fan.device_info["identifiers"]
 
 
 def test_enum_entities_normalize_api_values() -> None:

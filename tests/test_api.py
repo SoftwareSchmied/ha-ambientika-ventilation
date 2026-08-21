@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aiohttp import ClientSession
-from custom_components.ambientika.api import (
+from custom_components.ambientika_ventilation.api import (
     AmbientikaApiClient,
     AmbientikaAuthError,
     AmbientikaForbiddenError,
@@ -113,7 +113,9 @@ async def test_rate_limit_retries_then_succeeds() -> None:
     """HTTP 429 observes bounded retry behavior and records metrics."""
     client = make_client([FakeResponse(429), FakeResponse(200, [])])
 
-    with patch("custom_components.ambientika.api.asyncio.sleep", new=AsyncMock()):
+    with patch(
+        "custom_components.ambientika_ventilation.api.asyncio.sleep", new=AsyncMock()
+    ):
         assert await client.async_houses_info() == []
 
     assert client.metrics.rate_limit_events == 1
@@ -171,7 +173,10 @@ async def test_server_error_retries_then_raises() -> None:
     client = make_client([FakeResponse(503), FakeResponse(503), FakeResponse(503)])
 
     with (
-        patch("custom_components.ambientika.api.asyncio.sleep", new=AsyncMock()),
+        patch(
+            "custom_components.ambientika_ventilation.api.asyncio.sleep",
+            new=AsyncMock(),
+        ),
         pytest.raises(AmbientikaServerError),
     ):
         await client.async_houses_info()

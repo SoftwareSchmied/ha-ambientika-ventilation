@@ -10,7 +10,7 @@ htmlcov/
 *.egg-info/
 dist/
 build/
-ambientika.zip
+ambientika_ventilation.zip
 .env
 .vscode/
 .idea/

@@ -1,4 +1,4 @@
-# Ambientika for Home Assistant
+# Ambientika Ventilation for Home Assistant
 
 Ambientika is a native Home Assistant integration for cloud-connected Südwind
 Ambientika ventilation units. It discovers every supported device on an
@@ -36,12 +36,12 @@ Assistant config entry and are never written to logs or diagnostics.
 
 1. Open **HACS → Integrations → ⋮ → Custom repositories**.
 2. Add the repository URL as an **Integration**.
-3. Install **Ambientika** and restart Home Assistant.
-4. Open **Settings → Devices & services → Add integration → Ambientika**.
+3. Install **Ambientika Ventilation** and restart Home Assistant.
+4. Open **Settings → Devices & services → Add integration → Ambientika Ventilation**.
 
 ### Manual
 
-Copy `custom_components/ambientika` into the `custom_components` directory of
+Copy `custom_components/ambientika_ventilation` into the `custom_components` directory of
 your Home Assistant configuration, restart Home Assistant, and add the
 integration from the user interface.
 
@@ -83,27 +83,27 @@ Controls send only values documented as writable by the current API. Every
 write sends a complete, validated state and immediately reads the device state
 back so that cloud-side rounding or rejection is visible in Home Assistant.
 
-## Upgrading from the former integration
+## Moving from the former integration
 
-The integration intentionally keeps the `ambientika` domain. Version 1 config
-entries containing `username` and `password` are upgraded in place. Compatible
-sensor, binary-sensor, and button unique IDs are migrated from name-based to
-serial-based identifiers after discovery.
+This project deliberately uses the new `ambientika_ventilation` domain so it
+does not inherit unstable config entries or name-based unique IDs from the
+former `ambientika` integration. Remove the former integration, restart Home
+Assistant, install this project, and configure the account again.
 
 The previous climate entity is not retained because a ventilation unit is not
 an HVAC thermostat. It is replaced by a fan entity plus explicit selects. Any
 automation that targeted the old climate entity must be updated once.
 
 Back up the Home Assistant configuration before replacing an installed custom
-integration. Do not run both implementations under the same domain.
+integration. Existing automations must be updated to reference the new entities.
 
 ## Diagnostics and privacy
 
-Download diagnostics from **Settings → Devices & services → Ambientika → ⋮ →
-Download diagnostics**. Diagnostics include integration and entry versions,
-detected capabilities, request/status counters, update duration, and active
-conditions. Passwords, JWTs, email addresses, room/house names, full serial
-numbers, exact API payloads, and callback URLs are excluded.
+Download diagnostics from **Settings → Devices & services → Ambientika
+Ventilation → ⋮ → Download diagnostics**. Diagnostics include integration and
+entry versions, detected capabilities, request/status counters, update
+duration, and active conditions. Passwords, JWTs, email addresses, room/house
+names, full serial numbers, exact API payloads, and callback URLs are excluded.
 
 ## Troubleshooting
 
@@ -132,4 +132,3 @@ not part of this cloud integration.
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) and
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). The project is licensed under
 the MIT License and is not affiliated with or endorsed by Südwind s.r.l.
-

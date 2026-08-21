@@ -19,7 +19,7 @@ def _keys(value, prefix="") -> set[str]:
 
 def test_english_and_german_translations_are_complete() -> None:
     """Both shipped user interface languages expose identical keys."""
-    root = Path(__file__).parents[1] / "custom_components" / "ambientika"
+    root = Path(__file__).parents[1] / "custom_components" / "ambientika_ventilation"
     english = json.loads((root / "translations" / "en.json").read_text("utf-8"))
     german = json.loads((root / "translations" / "de.json").read_text("utf-8"))
 

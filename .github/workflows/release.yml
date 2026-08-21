@@ -20,5 +20,5 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/ambientika.zip
-            dist/ambientika.zip.sha256
+            dist/ambientika_ventilation.zip
+            dist/ambientika_ventilation.zip.sha256

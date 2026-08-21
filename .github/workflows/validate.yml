@@ -19,7 +19,7 @@ jobs:
       - run: python -m pip install -e ".[test]"
       - run: ruff check .
       - run: ruff format --check .
-      - run: mypy custom_components/ambientika
+      - run: mypy custom_components/ambientika_ventilation
       - run: pytest
       - uses: actions/upload-artifact@v4
         with:

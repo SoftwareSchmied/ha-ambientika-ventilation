@@ -1,0 +1,12 @@
+{
+  "domain": "ambientika_ventilation",
+  "name": "Ambientika Ventilation",
+  "codeowners": ["@SoftwareSchmied"],
+  "config_flow": true,
+  "documentation": "https://github.com/SoftwareSchmied/ha-ambientika-ventilation",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/SoftwareSchmied/ha-ambientika-ventilation/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
