@@ -1,0 +1,58 @@
+{
+  "title": "Ambientika",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Ambientika",
+        "description": "Enter the credentials used by the Ambientika app.",
+        "data": {
+          "username": "Email address",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reconnect Ambientika",
+        "description": "Enter valid Ambientika credentials to restore access.",
+        "data": {
+          "username": "Email address",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the Ambientika cloud",
+      "invalid_auth": "The credentials are invalid",
+      "invalid_response": "The Ambientika cloud returned an invalid response",
+      "no_devices": "No supported devices were found in this account",
+      "wrong_account": "These credentials belong to a different account",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "This Ambientika account is already configured",
+      "reauth_successful": "Authentication was renewed successfully"
+    }
+  },
+  "entity": {
+    "fan": { "ventilation": { "name": "Ventilation" } },
+    "sensor": {
+      "temperature": { "name": "Temperature" },
+      "humidity": { "name": "Humidity" },
+      "signal_strength": { "name": "Signal strength" },
+      "air_quality": { "name": "Air quality", "state": { "very_good": "Very good", "good": "Good", "medium": "Medium", "poor": "Poor", "bad": "Bad" } },
+      "filter_status": { "name": "Filter status", "state": { "good": "Good", "medium": "Replace soon", "bad": "Replace" } },
+      "last_operating_mode": { "name": "Last operating mode", "state": { "smart": "Smart", "auto": "Automatic", "heat_recovery": "Heat recovery", "night": "Night", "away": "Away", "surveillance": "Surveillance", "timed_extraction": "Timed extraction", "extraction": "Extraction", "intake": "Intake", "master_slave_flow": "Master to slave flow", "slave_master_flow": "Slave to master flow", "off": "Off" } }
+    },
+    "binary_sensor": {
+      "humidity_alarm": { "name": "Humidity alarm" },
+      "filter_problem": { "name": "Filter attention" },
+      "night": { "name": "Night detected" },
+      "schedule": { "name": "Schedule" }
+    },
+    "select": {
+      "operating_mode": { "name": "Operating mode", "state": { "smart": "Smart", "auto": "Automatic", "heat_recovery": "Heat recovery", "night": "Night", "away": "Away", "surveillance": "Surveillance", "timed_extraction": "Timed extraction", "extraction": "Extraction", "intake": "Intake", "off": "Off" } },
+      "humidity_level": { "name": "Humidity target", "state": { "dry": "Dry", "normal": "Normal", "moist": "Moist" } },
+      "light_sensor_level": { "name": "Light sensor sensitivity", "state": { "off": "Off", "low": "Low", "medium": "Medium" } }
+    },
+    "button": { "reset_filter": { "name": "Reset filter status" } }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "title": "Ambientika",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mit Ambientika verbinden",
+        "description": "Gib die Zugangsdaten der Ambientika-App ein.",
+        "data": {
+          "username": "E-Mail-Adresse",
+          "password": "Passwort"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Ambientika neu verbinden",
+        "description": "Gib gültige Ambientika-Zugangsdaten ein, um den Zugriff wiederherzustellen.",
+        "data": {
+          "username": "E-Mail-Adresse",
+          "password": "Passwort"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Keine Verbindung zur Ambientika-Cloud möglich",
+      "invalid_auth": "Die Zugangsdaten sind ungültig",
+      "invalid_response": "Die Ambientika-Cloud hat eine ungültige Antwort gesendet",
+      "no_devices": "In diesem Konto wurden keine unterstützten Geräte gefunden",
+      "wrong_account": "Diese Zugangsdaten gehören zu einem anderen Konto",
+      "unknown": "Unerwarteter Fehler"
+    },
+    "abort": {
+      "already_configured": "Dieses Ambientika-Konto ist bereits eingerichtet",
+      "reauth_successful": "Die Anmeldung wurde erfolgreich erneuert"
+    }
+  },
+  "entity": {
+    "fan": { "ventilation": { "name": "Lüftung" } },
+    "sensor": {
+      "temperature": { "name": "Temperatur" },
+      "humidity": { "name": "Luftfeuchtigkeit" },
+      "signal_strength": { "name": "Signalstärke" },
+      "air_quality": { "name": "Luftqualität", "state": { "very_good": "Sehr gut", "good": "Gut", "medium": "Mittel", "poor": "Schlecht", "bad": "Sehr schlecht" } },
+      "filter_status": { "name": "Filterstatus", "state": { "good": "Gut", "medium": "Bald wechseln", "bad": "Wechseln" } },
+      "last_operating_mode": { "name": "Letzte Betriebsart", "state": { "smart": "Smart", "auto": "Automatik", "heat_recovery": "Wärmerückgewinnung", "night": "Nacht", "away": "Abwesend", "surveillance": "Überwachung", "timed_extraction": "Zeitgesteuerte Abluft", "extraction": "Abluft", "intake": "Zuluft", "master_slave_flow": "Master-zu-Slave-Luftstrom", "slave_master_flow": "Slave-zu-Master-Luftstrom", "off": "Aus" } }
+    },
+    "binary_sensor": {
+      "humidity_alarm": { "name": "Feuchtealarm" },
+      "filter_problem": { "name": "Filter prüfen" },
+      "night": { "name": "Nacht erkannt" },
+      "schedule": { "name": "Zeitplan" }
+    },
+    "select": {
+      "operating_mode": { "name": "Betriebsart", "state": { "smart": "Smart", "auto": "Automatik", "heat_recovery": "Wärmerückgewinnung", "night": "Nacht", "away": "Abwesend", "surveillance": "Überwachung", "timed_extraction": "Zeitgesteuerte Abluft", "extraction": "Abluft", "intake": "Zuluft", "off": "Aus" } },
+      "humidity_level": { "name": "Feuchteziel", "state": { "dry": "Trocken", "normal": "Normal", "moist": "Feucht" } },
+      "light_sensor_level": { "name": "Lichtsensor-Empfindlichkeit", "state": { "off": "Aus", "low": "Niedrig", "medium": "Mittel" } }
+    },
+    "button": { "reset_filter": { "name": "Filterstatus zurücksetzen" } }
+  }
+}
