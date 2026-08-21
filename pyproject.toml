@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ha-ambientika"
+version = "0.1.0"
+description = "Home Assistant integration for Ambientika ventilation systems"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [{ name = "Ambientika Home Assistant contributors" }]
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = []
+
+[project.optional-dependencies]
+test = [
+  "homeassistant==2026.8.2",
+  "pytest-homeassistant-custom-component==0.13.356",
+  "pytest>=9.0,<10",
+  "pytest-asyncio>=1.0,<2",
+  "pytest-cov>=7.0,<8",
+  "ruff==0.16.4",
+  "mypy==2.3.1",
+]
+
+[tool.setuptools]
+packages = []
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --strict-config --cov=custom_components.ambientika --cov-report=term-missing --cov-report=xml"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+src = ["custom_components", "tests"]
+
+[tool.ruff.lint]
+select = ["B", "D", "E", "F", "I", "RUF", "SIM", "UP"]
+ignore = [
+  "ANN401",
+  "COM812",
+  "D203",
+  "D213",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["ANN", "ARG001", "D", "PLR2004", "S101", "SLF001"]
+
+[tool.mypy]
+python_version = "3.14"
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+show_error_codes = true
+strict_equality = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unused_ignores = true
+exclude = ["tests"]
+
+[[tool.mypy.overrides]]
+module = ["homeassistant.*"]
+ignore_missing_imports = true
