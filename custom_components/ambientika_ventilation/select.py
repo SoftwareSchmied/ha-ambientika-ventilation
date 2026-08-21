@@ -122,5 +122,7 @@ class AmbientikaSelect(AmbientikaEntity, SelectEntity):
             raise ValueError(f"Unsupported option: {option}")
         await self.coordinator.async_write_state(
             self._serial,
-            **{self.entity_description.write_field: self._api_by_option[option]},
+            **{  # type: ignore[arg-type]
+                self.entity_description.write_field: self._api_by_option[option]
+            },
         )

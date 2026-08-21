@@ -27,6 +27,24 @@ async def async_get_config_entry_diagnostics(
                 "device_subtype": device_data.device.device_subtype,
                 "role": device_data.device.role,
                 "has_status": status is not None,
+                "metadata": {
+                    "has_installation": device_data.device.installation is not None,
+                    "has_room": device_data.device.room_name is not None,
+                    "has_zone": device_data.device.zone_name is not None,
+                    "firmware_fields": sum(
+                        value is not None
+                        for value in (
+                            device_data.device.micro_firmware,
+                            device_data.device.radio_firmware,
+                            device_data.device.radio_at_firmware,
+                        )
+                    ),
+                    "schedule_entries": (
+                        len(device_data.schedule.time_slots)
+                        if device_data.schedule is not None
+                        else None
+                    ),
+                },
                 "capabilities": {
                     "fan_control": status is not None and _has_writable_state(status),
                     "light_sensor": (
@@ -61,7 +79,9 @@ async def async_get_config_entry_diagnostics(
         },
         "supported_resources": [
             "houses_info",
+            "house_devices_status",
             "device_status",
+            "schedule",
             "change_mode",
             "reset_filter",
             "feature_flags",

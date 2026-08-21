@@ -48,11 +48,22 @@ class AmbientikaEntity(CoordinatorEntity[AmbientikaCoordinator]):
         model = device.device_type or "Ambientika ventilation unit"
         if device.device_subtype and device.device_subtype != "None":
             model = f"{model} {device.device_subtype}"
-        firmware_parts = [device.micro_firmware, device.radio_firmware]
+        firmware_parts = [
+            device.micro_firmware,
+            device.radio_firmware,
+            device.radio_at_firmware,
+        ]
         return DeviceInfo(
             identifiers={(DOMAIN, self._serial)},
             manufacturer="Südwind",
             name=device.name,
             model=model,
+            hw_version=(
+                device.device_subtype
+                if device.device_subtype not in (None, "None")
+                else None
+            ),
+            serial_number=self._serial,
+            suggested_area=device.room_name,
             sw_version=" / ".join(part for part in firmware_parts if part) or None,
         )

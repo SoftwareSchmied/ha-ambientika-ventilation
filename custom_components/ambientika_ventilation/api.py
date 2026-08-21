@@ -177,6 +177,26 @@ class AmbientikaApiClient:
             raise AmbientikaResponseError("Device status response is not an object")
         return payload
 
+    async def async_house_devices_status(self, house_id: int) -> dict[str, Any]:
+        """Return all available status packets for one house."""
+        payload = await self._request(
+            "GET",
+            "/Device/house-devices-status",
+            params={"houseId": str(house_id)},
+        )
+        if not isinstance(payload, dict):
+            self.metrics.parser_errors += 1
+            raise AmbientikaResponseError("House status response is not an object")
+        return payload
+
+    async def async_schedule(self, device_id: int) -> dict[str, Any]:
+        """Return the weekly schedule configured for one device."""
+        payload = await self._request("GET", f"/Schedule/{device_id}")
+        if not isinstance(payload, dict):
+            self.metrics.parser_errors += 1
+            raise AmbientikaResponseError("Schedule response is not an object")
+        return payload
+
     async def async_feature_flags(self) -> dict[str, bool]:
         """Return account-independent server feature flags."""
         payload = await self._request("GET", "/Users/feature-flags")

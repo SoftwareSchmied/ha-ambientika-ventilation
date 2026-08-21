@@ -8,6 +8,7 @@ that every firmware or account supports every field.
 | Resource | Type | Unit / states | Access | Polling | HA platform | Default |
 | --- | --- | --- | --- | --- | --- | --- |
 | `/House/houses-info` | object list | Houses, rooms, zones, devices | Read | Start + 6 h | Device discovery | N/A |
+| `/Device/house-devices-status` | object | All available house status packets | Read | 60 s | Coordinator batch source | N/A |
 | `/Device/device-status` temperature | integer | °C | Read | 60 s | Sensor | Enabled |
 | `/Device/device-status` humidity | integer | % | Read | 60 s | Sensor | Enabled |
 | `/Device/device-status` air quality | enum | VeryGood…Bad | Read | 60 s | Sensor | Enabled |
@@ -21,6 +22,7 @@ that every firmware or account supports every field.
 | `/Device/change-mode` humidity level | enum | Dry, Normal, Moist | Read/write | On demand + read-back | Select | Enabled |
 | `/Device/change-mode` light level | enum | Off, Low, Medium | Read/write when reported | On demand + read-back | Select | Enabled |
 | `/Device/reset-filter` | command | Reset | Write + read-back | On demand | Button | Enabled |
+| `/Schedule/{deviceId}` | object | Weekly time slots | Read | Start + 6 h | Diagnostic sensor | Disabled |
 | `/Users/feature-flags` | booleans | Server features | Read | Start + 6 h | Diagnostics | N/A |
 | `/Users/refresh-token` | token | JWT expiry | Read | Before expiry | Internal | N/A |
 
@@ -32,7 +34,7 @@ retried during every polling cycle.
 ## Deliberately excluded writes
 
 Factory/device reset, role configuration, house/room/zone mutation, email and
-password changes, account deletion, and schedule mutation are not exposed.
-They are either destructive, administrative, insufficiently verified, or not
-needed for normal Home Assistant automations.
-
+password changes, account deletion, and schedule time-slot mutation are not
+exposed. They are either destructive, administrative, insufficiently verified,
+or not needed for normal Home Assistant automations. Enabling or disabling an
+existing schedule is supported through the documented `isScheduleMode` field.

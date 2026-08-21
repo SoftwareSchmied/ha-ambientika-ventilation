@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 from .const import (
@@ -26,12 +27,16 @@ class AmbientikaDevice:
     device_type: str | None = None
     device_subtype: str | None = None
     role: str | None = None
+    zone_index: int | None = None
+    installation: datetime | None = None
     house_id: int | None = None
     house_name: str | None = None
+    room_id: int | None = None
     room_name: str | None = None
     zone_name: str | None = None
     radio_firmware: str | None = None
     micro_firmware: str | None = None
+    radio_at_firmware: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,11 +62,34 @@ class AmbientikaStatus:
 
 
 @dataclass(frozen=True, slots=True)
+class AmbientikaTimeSlot:
+    """One weekly schedule time slot."""
+
+    slot_id: int | None = None
+    day_of_week: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    operating_mode: str | None = None
+    fan_speed: str | None = None
+    humidity_level: str | None = None
+    light_sensor_level: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AmbientikaSchedule:
+    """Read-only weekly schedule information for one device."""
+
+    schedule_id: int | None = None
+    time_slots: tuple[AmbientikaTimeSlot, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class AmbientikaDeviceData:
     """Combined static and dynamic state for an Ambientika unit."""
 
     device: AmbientikaDevice
     status: AmbientikaStatus | None = None
+    schedule: AmbientikaSchedule | None = None
 
 
 @dataclass(slots=True)
@@ -98,6 +126,17 @@ def _integer(value: object) -> int | None:
 def _boolean(value: object) -> bool | None:
     """Return a boolean value or None."""
     return value if isinstance(value, bool) else None
+
+
+def _datetime(value: object) -> datetime | None:
+    """Parse an ISO timestamp without rejecting a missing timezone."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
 
 
 def _enum(value: object, known_values: tuple[str, ...]) -> str | None:
@@ -140,12 +179,16 @@ def parse_houses(payload: object) -> dict[str, AmbientikaDevice]:
                 raw.get("role"),
                 ("Master", "SlaveEqualMaster", "SlaveOppositeMaster", "NotConfigured"),
             ),
+            zone_index=_integer(raw.get("zoneIndex")),
+            installation=_datetime(raw.get("installation")),
             house_id=house_id,
             house_name=house_name,
+            room_id=_integer(raw.get("roomId")),
             room_name=room_name,
             zone_name=zone_name,
             radio_firmware=_text(raw.get("radioFwVersion")),
             micro_firmware=_text(raw.get("microFwVersion")),
+            radio_at_firmware=_text(raw.get("radioAtCommandsFwVersion")),
         )
 
     def add_room(
@@ -246,4 +289,52 @@ def parse_status(payload: object, fallback_serial: str) -> AmbientikaStatus:
         signal_strength=_integer(raw.get("signalStrenght")),
         schedule_state=_enum(raw.get("isScheduled"), SCHEDULE_STATES),
         turbo_available=_boolean(raw.get("isTurboAvailable")) is True,
+    )
+
+
+def parse_house_statuses(payload: object) -> dict[str, AmbientikaStatus]:
+    """Extract all device status packets from a house batch response."""
+    raw = _mapping(payload)
+    packets: list[object] = []
+    packets.extend(
+        _mapping(item).get("statusPacket") for item in _list(raw.get("zoneDevicesInfo"))
+    )
+    packets.extend(
+        _mapping(item).get("statusPacket")
+        for item in _list(raw.get("geminiDevicesInfo"))
+    )
+    packets.append(raw.get("uniqueZoneStatusPacket"))
+
+    statuses: dict[str, AmbientikaStatus] = {}
+    for packet in packets:
+        packet_mapping = _mapping(packet)
+        serial = _text(packet_mapping.get("deviceSerialNumber"))
+        if serial is not None:
+            statuses[serial] = parse_status(packet_mapping, serial)
+    return statuses
+
+
+def parse_schedule(payload: object) -> AmbientikaSchedule:
+    """Parse a read-only device schedule and its weekly time slots."""
+    raw = _mapping(payload)
+    slots: list[AmbientikaTimeSlot] = []
+    for value in _list(raw.get("timeSlots")):
+        slot = _mapping(value)
+        slots.append(
+            AmbientikaTimeSlot(
+                slot_id=_integer(slot.get("id")),
+                day_of_week=_text(slot.get("dayOfWeek")),
+                start_time=_text(slot.get("startTime")),
+                end_time=_text(slot.get("endTime")),
+                operating_mode=_enum(slot.get("operatingMode"), OPERATING_MODES),
+                fan_speed=_enum(slot.get("fanSpeed"), FAN_SPEEDS),
+                humidity_level=_enum(slot.get("humidityLevel"), HUMIDITY_LEVELS),
+                light_sensor_level=_enum(
+                    slot.get("lightSensorLevel"), LIGHT_SENSOR_LEVELS
+                ),
+            )
+        )
+    return AmbientikaSchedule(
+        schedule_id=_integer(raw.get("id")),
+        time_slots=tuple(slots),
     )

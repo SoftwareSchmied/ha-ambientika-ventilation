@@ -43,11 +43,13 @@ class AmbientikaFan(AmbientikaEntity, FanEntity):
         FanEntityFeature.TURN_ON
         | FanEntityFeature.TURN_OFF
         | FanEntityFeature.SET_SPEED
+        | FanEntityFeature.PRESET_MODE
     )
 
     def __init__(self, coordinator: Any, serial: str) -> None:
         """Initialize an Ambientika fan entity."""
         super().__init__(coordinator, serial, "ventilation")
+        self._attr_preset_modes = ["night"]
 
     @property
     def is_on(self) -> bool | None:
@@ -66,6 +68,8 @@ class AmbientikaFan(AmbientikaEntity, FanEntity):
         """Map the reported fan speed to a Home Assistant percentage."""
         if self.status is None or self.status.fan_speed is None:
             return None
+        if self.status.fan_speed == "Night":
+            return None
         speeds = self._writable_speeds
         try:
             return round((speeds.index(self.status.fan_speed) + 1) * 100 / len(speeds))
@@ -80,6 +84,15 @@ class AmbientikaFan(AmbientikaEntity, FanEntity):
             speeds += ("Turbo",)
         return speeds
 
+    @property
+    def preset_mode(self) -> str | None:
+        """Represent the API's special Night speed as a fan preset."""
+        if self.status is None:
+            return None
+        if self.status.fan_speed == "Night" or self.status.operating_mode == "Night":
+            return "night"
+        return None
+
     async def async_turn_on(
         self,
         percentage: int | None = None,
@@ -87,6 +100,9 @@ class AmbientikaFan(AmbientikaEntity, FanEntity):
         **kwargs: Any,
     ) -> None:
         """Turn on, restoring the last safe user operating mode."""
+        if preset_mode is not None:
+            await self.async_set_preset_mode(preset_mode)
+            return
         status = self.status
         if status is None:
             return
@@ -113,9 +129,29 @@ class AmbientikaFan(AmbientikaEntity, FanEntity):
         if percentage == 0:
             await self.async_turn_off()
             return
+        status = self.status
+        operating_mode = None
+        if status is not None and status.operating_mode == "Night":
+            operating_mode = (
+                status.last_operating_mode
+                if status.last_operating_mode in USER_OPERATING_MODES
+                and status.last_operating_mode != "Night"
+                else "ManualHeatRecovery"
+            )
         await self.coordinator.async_write_state(
             self._serial,
+            operating_mode=operating_mode,
             fan_speed=self._speed_for_percentage(percentage),
+        )
+
+    async def async_set_preset_mode(self, preset_mode: str) -> None:
+        """Set the special low-noise Night operating state."""
+        if preset_mode != "night":
+            raise ValueError(f"Unsupported preset mode: {preset_mode}")
+        await self.coordinator.async_write_state(
+            self._serial,
+            operating_mode="Night",
+            fan_speed="Night",
         )
 
     def _speed_for_percentage(self, percentage: int) -> str:

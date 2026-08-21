@@ -20,9 +20,10 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from . import AmbientikaRuntimeData
 from .const import AIR_QUALITY_LEVELS, API_TO_HA, FILTER_STATUSES, OPERATING_MODES
 from .entity import AmbientikaEntity
-from .models import AmbientikaStatus
+from .models import AmbientikaDevice, AmbientikaStatus
 
 ValueFn = Callable[[AmbientikaStatus], Any]
+DeviceValueFn = Callable[[AmbientikaDevice], Any]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -30,6 +31,14 @@ class AmbientikaSensorDescription(SensorEntityDescription):
     """Describe an Ambientika sensor."""
 
     value_fn: ValueFn
+    enum_values: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, kw_only=True)
+class AmbientikaDeviceSensorDescription(SensorEntityDescription):
+    """Describe a static or slowly changing diagnostic value."""
+
+    value_fn: DeviceValueFn
     enum_values: tuple[str, ...] = ()
 
 
@@ -82,6 +91,115 @@ SENSORS = (
     ),
 )
 
+DEVICE_SENSORS = (
+    AmbientikaDeviceSensorDescription(
+        key="device_type",
+        translation_key="device_type",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.device_type,
+    ),
+    AmbientikaDeviceSensorDescription(
+        key="device_subtype",
+        translation_key="device_subtype",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.device_subtype,
+    ),
+    AmbientikaDeviceSensorDescription(
+        key="device_role",
+        translation_key="device_role",
+        device_class=SensorDeviceClass.ENUM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.role,
+        enum_values=(
+            "Master",
+            "SlaveEqualMaster",
+            "SlaveOppositeMaster",
+            "NotConfigured",
+        ),
+    ),
+    AmbientikaDeviceSensorDescription(
+        key="installation",
+        translation_key="installation",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.installation,
+    ),
+    AmbientikaDeviceSensorDescription(
+        key="micro_firmware",
+        translation_key="micro_firmware",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.micro_firmware,
+    ),
+    AmbientikaDeviceSensorDescription(
+        key="radio_firmware",
+        translation_key="radio_firmware",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.radio_firmware,
+    ),
+    AmbientikaDeviceSensorDescription(
+        key="radio_at_firmware",
+        translation_key="radio_at_firmware",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.radio_at_firmware,
+    ),
+    AmbientikaDeviceSensorDescription(
+        key="house",
+        translation_key="house",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.house_name,
+    ),
+    AmbientikaDeviceSensorDescription(
+        key="zone",
+        translation_key="zone",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.zone_name,
+    ),
+    AmbientikaDeviceSensorDescription(
+        key="room",
+        translation_key="room",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.room_name,
+    ),
+    AmbientikaDeviceSensorDescription(
+        key="device_id",
+        translation_key="device_id",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.device_id,
+    ),
+    AmbientikaDeviceSensorDescription(
+        key="house_id",
+        translation_key="house_id",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.house_id,
+    ),
+    AmbientikaDeviceSensorDescription(
+        key="room_id",
+        translation_key="room_id",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.room_id,
+    ),
+    AmbientikaDeviceSensorDescription(
+        key="zone_index",
+        translation_key="zone_index",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.zone_index,
+    ),
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -90,19 +208,35 @@ async def async_setup_entry(
 ) -> None:
     """Set up sensors and add sensors for devices discovered later."""
     coordinator = entry.runtime_data.coordinator
-    known: set[str] = set()
+    known_devices: set[str] = set()
+    known_diagnostics: set[tuple[str, str]] = set()
+    known_schedules: set[str] = set()
 
     @callback
     def add_new_entities() -> None:
-        serials = set(coordinator.data.devices) - known
-        entities = [
+        serials = set(coordinator.data.devices) - known_devices
+        entities: list[SensorEntity] = [
             AmbientikaSensor(coordinator, serial, description)
             for serial in serials
             for description in SENSORS
         ]
+        for serial, device_data in coordinator.data.devices.items():
+            for description in DEVICE_SENSORS:
+                key = (serial, description.key)
+                if (
+                    key not in known_diagnostics
+                    and description.value_fn(device_data.device) is not None
+                ):
+                    entities.append(
+                        AmbientikaDeviceSensor(coordinator, serial, description)
+                    )
+                    known_diagnostics.add(key)
+            if device_data.schedule is not None and serial not in known_schedules:
+                entities.append(AmbientikaScheduleSensor(coordinator, serial))
+                known_schedules.add(serial)
         if entities:
             async_add_entities(entities)
-            known.update(serials)
+            known_devices.update(serials)
 
     add_new_entities()
     entry.async_on_unload(coordinator.async_add_listener(add_new_entities))
@@ -134,3 +268,74 @@ class AmbientikaSensor(AmbientikaEntity, SensorEntity):
         if self.entity_description.enum_values:
             return API_TO_HA.get(value)
         return value
+
+
+class AmbientikaDeviceSensor(AmbientikaEntity, SensorEntity):
+    """Represent static device metadata as an optional diagnostic entity."""
+
+    entity_description: AmbientikaDeviceSensorDescription
+
+    def __init__(
+        self,
+        coordinator: Any,
+        serial: str,
+        description: AmbientikaDeviceSensorDescription,
+    ) -> None:
+        """Initialize the metadata sensor."""
+        super().__init__(coordinator, serial, description.key)
+        self.entity_description = description
+        if description.enum_values:
+            self._attr_options = [API_TO_HA[value] for value in description.enum_values]
+
+    @property
+    def available(self) -> bool:
+        """Keep metadata available independently of a status packet."""
+        return self.coordinator.last_update_success and self.native_value is not None
+
+    @property
+    def native_value(self) -> Any:
+        """Return the parsed device metadata value."""
+        value = self.entity_description.value_fn(self.device_data.device)
+        if self.entity_description.enum_values:
+            return API_TO_HA.get(value)
+        return value
+
+
+class AmbientikaScheduleSensor(AmbientikaEntity, SensorEntity):
+    """Expose the number and content of configured weekly time slots."""
+
+    _attr_translation_key = "schedule_entries"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator: Any, serial: str) -> None:
+        """Initialize the schedule summary sensor."""
+        super().__init__(coordinator, serial, "schedule_entries")
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the number of configured weekly time slots."""
+        schedule = self.device_data.schedule
+        return len(schedule.time_slots) if schedule is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return normalized read-only schedule details."""
+        schedule = self.device_data.schedule
+        if schedule is None:
+            return {}
+        return {
+            "schedule_id": schedule.schedule_id,
+            "time_slots": [
+                {
+                    "day_of_week": slot.day_of_week,
+                    "start_time": slot.start_time,
+                    "end_time": slot.end_time,
+                    "operating_mode": slot.operating_mode,
+                    "fan_speed": slot.fan_speed,
+                    "humidity_level": slot.humidity_level,
+                    "light_sensor_level": slot.light_sensor_level,
+                }
+                for slot in schedule.time_slots
+            ],
+        }

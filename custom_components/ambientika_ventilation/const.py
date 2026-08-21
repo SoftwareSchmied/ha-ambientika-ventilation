@@ -25,6 +25,7 @@ PLATFORMS: Final = (
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
     Platform.SELECT,
+    Platform.SWITCH,
     Platform.BUTTON,
 )
 
@@ -76,4 +77,8 @@ API_TO_HA: Final = {
     "Poor": "poor",
     "Bad": "bad",
     "On": "on",
+    "Master": "master",
+    "SlaveEqualMaster": "slave_equal_master",
+    "SlaveOppositeMaster": "slave_opposite_master",
+    "NotConfigured": "not_configured",
 }

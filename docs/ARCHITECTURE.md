@@ -5,14 +5,16 @@ One config entry represents one Ambientika cloud account. It owns one shared
 
 The client centralizes authentication, token refresh, concurrency limiting,
 HTTP classification, backoff, JSON parsing, and non-sensitive request metrics.
-The coordinator refreshes static discovery separately from dynamic status,
-retains successful device data through partial outages, and performs read-back
-after commands.
+The coordinator refreshes static discovery and read-only schedules separately
+from dynamic status. Status polling prefers one aggregate request per house and
+falls back to individual devices for missing packets. Successful device data is
+retained through partial outages, and commands are followed by an immediate
+read-back.
 
 Platforms consume immutable combined device/status models. Their entity unique
 IDs use `<serial>_<entity-key>`; device registry identifiers use
-`(ambientika_ventilation, <serial>)`. These identifiers are compatibility contracts and
-must not change after release.
+`(ambientika_ventilation, <serial>)`. These identifiers are compatibility
+contracts and must not change after release.
 
 New device serials are detected by platform listeners after coordinator
 updates. Optional controls are instantiated only after the corresponding

@@ -109,6 +109,20 @@ async def test_optional_404_is_classified() -> None:
 
 
 @pytest.mark.asyncio
+async def test_batch_status_and_schedule_are_read_as_objects() -> None:
+    """Optional aggregate and schedule resources validate their response shape."""
+    client = make_client(
+        [
+            FakeResponse(200, {"zoneDevicesInfo": []}),
+            FakeResponse(200, {"id": 7, "timeSlots": []}),
+        ]
+    )
+
+    assert await client.async_house_devices_status(10) == {"zoneDevicesInfo": []}
+    assert await client.async_schedule(101) == {"id": 7, "timeSlots": []}
+
+
+@pytest.mark.asyncio
 async def test_rate_limit_retries_then_succeeds() -> None:
     """HTTP 429 observes bounded retry behavior and records metrics."""
     client = make_client([FakeResponse(429), FakeResponse(200, [])])

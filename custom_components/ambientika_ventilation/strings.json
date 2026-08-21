@@ -34,7 +34,14 @@
   },
   "entity": {
     "fan": {
-      "ventilation": { "name": "Ventilation" }
+      "ventilation": {
+        "name": "Ventilation",
+        "state_attributes": {
+          "preset_mode": {
+            "state": { "night": "Night" }
+          }
+        }
+      }
     },
     "sensor": {
       "temperature": { "name": "Temperature" },
@@ -74,7 +81,30 @@
           "slave_master_flow": "Slave to master flow",
           "off": "Off"
         }
-      }
+      },
+      "device_type": { "name": "Device type" },
+      "device_subtype": { "name": "Device subtype" },
+      "device_role": {
+        "name": "Device role",
+        "state": {
+          "master": "Master",
+          "slave_equal_master": "Slave synchronized",
+          "slave_opposite_master": "Slave alternating",
+          "not_configured": "Not configured"
+        }
+      },
+      "installation": { "name": "Installation" },
+      "micro_firmware": { "name": "Controller firmware" },
+      "radio_firmware": { "name": "Radio firmware" },
+      "radio_at_firmware": { "name": "Radio AT firmware" },
+      "house": { "name": "House" },
+      "zone": { "name": "Zone" },
+      "room": { "name": "Room" },
+      "device_id": { "name": "Cloud device ID" },
+      "house_id": { "name": "Cloud house ID" },
+      "room_id": { "name": "Cloud room ID" },
+      "zone_index": { "name": "Zone index" },
+      "schedule_entries": { "name": "Schedule entries" }
     },
     "binary_sensor": {
       "humidity_alarm": { "name": "Humidity alarm" },
@@ -114,6 +144,9 @@
           "medium": "Medium"
         }
       }
+    },
+    "switch": {
+      "schedule": { "name": "Schedule control" }
     },
     "button": {
       "reset_filter": { "name": "Reset filter status" }

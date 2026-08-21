@@ -33,14 +33,29 @@
     }
   },
   "entity": {
-    "fan": { "ventilation": { "name": "Lüftung" } },
+    "fan": { "ventilation": { "name": "Lüftung", "state_attributes": { "preset_mode": { "state": { "night": "Nacht" } } } } },
     "sensor": {
       "temperature": { "name": "Temperatur" },
       "humidity": { "name": "Luftfeuchtigkeit" },
       "signal_strength": { "name": "Signalstärke" },
       "air_quality": { "name": "Luftqualität", "state": { "very_good": "Sehr gut", "good": "Gut", "medium": "Mittel", "poor": "Schlecht", "bad": "Sehr schlecht" } },
       "filter_status": { "name": "Filterstatus", "state": { "good": "Gut", "medium": "Bald wechseln", "bad": "Wechseln" } },
-      "last_operating_mode": { "name": "Letzte Betriebsart", "state": { "smart": "Smart", "auto": "Automatik", "heat_recovery": "Wärmerückgewinnung", "night": "Nacht", "away": "Abwesend", "surveillance": "Überwachung", "timed_extraction": "Zeitgesteuerte Abluft", "extraction": "Abluft", "intake": "Zuluft", "master_slave_flow": "Master-zu-Slave-Luftstrom", "slave_master_flow": "Slave-zu-Master-Luftstrom", "off": "Aus" } }
+      "last_operating_mode": { "name": "Letzte Betriebsart", "state": { "smart": "Smart", "auto": "Automatik", "heat_recovery": "Wärmerückgewinnung", "night": "Nacht", "away": "Abwesend", "surveillance": "Überwachung", "timed_extraction": "Zeitgesteuerte Abluft", "extraction": "Abluft", "intake": "Zuluft", "master_slave_flow": "Master-zu-Slave-Luftstrom", "slave_master_flow": "Slave-zu-Master-Luftstrom", "off": "Aus" } },
+      "device_type": { "name": "Gerätetyp" },
+      "device_subtype": { "name": "Geräteuntertyp" },
+      "device_role": { "name": "Geräterolle", "state": { "master": "Master", "slave_equal_master": "Slave synchron", "slave_opposite_master": "Slave alternierend", "not_configured": "Nicht konfiguriert" } },
+      "installation": { "name": "Installation" },
+      "micro_firmware": { "name": "Controller-Firmware" },
+      "radio_firmware": { "name": "Funk-Firmware" },
+      "radio_at_firmware": { "name": "Funk-AT-Firmware" },
+      "house": { "name": "Haus" },
+      "zone": { "name": "Zone" },
+      "room": { "name": "Raum" },
+      "device_id": { "name": "Cloud-Geräte-ID" },
+      "house_id": { "name": "Cloud-Haus-ID" },
+      "room_id": { "name": "Cloud-Raum-ID" },
+      "zone_index": { "name": "Zonenindex" },
+      "schedule_entries": { "name": "Zeitplaneinträge" }
     },
     "binary_sensor": {
       "humidity_alarm": { "name": "Feuchtealarm" },
@@ -53,6 +68,7 @@
       "humidity_level": { "name": "Feuchteziel", "state": { "dry": "Trocken", "normal": "Normal", "moist": "Feucht" } },
       "light_sensor_level": { "name": "Lichtsensor-Empfindlichkeit", "state": { "off": "Aus", "low": "Niedrig", "medium": "Mittel" } }
     },
+    "switch": { "schedule": { "name": "Zeitplansteuerung" } },
     "button": { "reset_filter": { "name": "Filterstatus zurücksetzen" } }
   }
 }

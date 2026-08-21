@@ -35,7 +35,12 @@ def houses_payload() -> list[dict[str, Any]]:
                                     "deviceType": "Diamond",
                                     "deviceSubtype": "Version160",
                                     "role": "Master",
+                                    "zoneIndex": 1,
+                                    "installation": "2025-01-02T03:04:05+00:00",
+                                    "roomId": 201,
                                     "microFwVersion": "1.2.3",
+                                    "radioFwVersion": "2.3.4",
+                                    "radioAtCommandsFwVersion": "3.4.5",
                                 }
                             ],
                         }

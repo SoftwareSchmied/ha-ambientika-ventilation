@@ -14,8 +14,11 @@ Ambientika account and provides monitoring and safe controls without YAML.
 - Home Assistant Config Flow with token refresh and reauthentication
 - Dynamic discovery across houses, rooms, zones, and Gemini devices
 - Fan power and speed control, including Turbo when reported by the device
+- Dedicated Night preset instead of treating Night as a numeric fan speed
 - Operating mode, humidity target, and light sensitivity controls
+- Schedule status/control and read-only weekly time-slot details when available
 - Temperature, humidity, air quality, filter state, alarms, and schedule state
+- Optional diagnostic entities for topology, firmware, role, and installation data
 - Partial-failure handling, rate-limit backoff, and last-good-value retention
 - Privacy-preserving diagnostics and complete English/German translations
 
@@ -52,6 +55,7 @@ Each discovered ventilation unit receives:
 | Platform | Entity | Default |
 | --- | --- | --- |
 | Fan | Ventilation power and speed | Enabled |
+| Fan preset | Night operation | Enabled |
 | Select | Operating mode | Enabled |
 | Select | Humidity target | Enabled |
 | Select | Light sensor sensitivity | Enabled when supported |
@@ -63,9 +67,14 @@ Each discovered ventilation unit receives:
 | Binary sensor | Filter attention | Enabled |
 | Binary sensor | Night detected | Enabled |
 | Binary sensor | Schedule active | Enabled |
+| Switch | Schedule control | Enabled when supported |
 | Button | Reset filter status | Enabled |
 | Sensor | Signal strength | Disabled |
 | Sensor | Last operating mode | Disabled |
+| Sensor | Weekly schedule entries and details | Disabled when available |
+| Sensors | Device role, type, subtype, and cloud IDs | Disabled |
+| Sensors | Installation and firmware versions | Disabled |
+| Sensors | House, zone, and room assignment | Disabled when available |
 
 Unknown API values become unavailable for the affected entity instead of
 stopping the integration. New devices and newly reported light/Turbo
@@ -73,11 +82,13 @@ capabilities are adopted without restarting Home Assistant.
 
 ## Polling and cloud usage
 
-Device status is refreshed every 60 seconds. Discovery metadata and server
-features are refreshed every six hours. Requests are limited to three in
-parallel. HTTP 429 and temporary server errors use bounded exponential backoff
-with jitter. A failure of one optional resource or device retains its last good
-data and does not block other devices.
+Device status is refreshed every 60 seconds, preferably through one aggregate
+request per house. Missing packets automatically fall back to per-device
+requests. Discovery metadata, weekly schedules, and server features are
+refreshed every six hours. Requests are limited to three in parallel. HTTP 429
+and temporary server errors use bounded exponential backoff with jitter. A
+failure of one optional resource or device retains its last good data and does
+not block other devices.
 
 Controls send only values documented as writable by the current API. Every
 write sends a complete, validated state and immediately reads the device state

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from dataclasses import replace
+from unittest.mock import AsyncMock, MagicMock
 
 from custom_components.ambientika_ventilation.fan import AmbientikaFan
 from custom_components.ambientika_ventilation.models import (
@@ -12,7 +13,13 @@ from custom_components.ambientika_ventilation.models import (
     AmbientikaStatus,
 )
 from custom_components.ambientika_ventilation.select import SELECTS, AmbientikaSelect
-from custom_components.ambientika_ventilation.sensor import SENSORS, AmbientikaSensor
+from custom_components.ambientika_ventilation.sensor import (
+    DEVICE_SENSORS,
+    SENSORS,
+    AmbientikaDeviceSensor,
+    AmbientikaSensor,
+)
+from custom_components.ambientika_ventilation.switch import AmbientikaScheduleSwitch
 
 SERIAL = "AABBCCDDEEFF"
 
@@ -28,6 +35,7 @@ def coordinator_with_status():
                     serial_number=SERIAL,
                     name="Living room",
                     device_type="Diamond",
+                    role="Master",
                 ),
                 status=AmbientikaStatus(
                     serial_number=SERIAL,
@@ -75,3 +83,62 @@ def test_fan_maps_turbo_percentage() -> None:
     assert fan.speed_count == 4
     assert fan.percentage == 50
     assert fan._speed_for_percentage(100) == "Turbo"
+
+
+async def test_fan_represents_night_as_preset() -> None:
+    """The special Night speed is controllable without a fake percentage."""
+    coordinator = coordinator_with_status()
+    coordinator.async_write_state = AsyncMock()
+    coordinator.data.devices[SERIAL] = replace(
+        coordinator.data.devices[SERIAL],
+        status=AmbientikaStatus(
+            serial_number=SERIAL,
+            operating_mode="Night",
+            fan_speed="Night",
+            humidity_level="Normal",
+            light_sensor_level="Low",
+        ),
+    )
+    fan = AmbientikaFan(coordinator, SERIAL)
+
+    assert fan.preset_mode == "night"
+    assert fan.percentage is None
+    await fan.async_set_preset_mode("night")
+    coordinator.async_write_state.assert_awaited_once_with(
+        SERIAL,
+        operating_mode="Night",
+        fan_speed="Night",
+    )
+
+
+async def test_schedule_switch_controls_schedule_mode() -> None:
+    """Schedule control uses the dedicated change-mode flag."""
+    coordinator = coordinator_with_status()
+    coordinator.async_write_state = AsyncMock()
+    coordinator.data.devices[SERIAL] = replace(
+        coordinator.data.devices[SERIAL],
+        status=AmbientikaStatus(
+            serial_number=SERIAL,
+            operating_mode="Auto",
+            fan_speed="Low",
+            humidity_level="Normal",
+            light_sensor_level="Low",
+            schedule_state="On",
+        ),
+    )
+    entity = AmbientikaScheduleSwitch(coordinator, SERIAL)
+
+    assert entity.is_on is True
+    await entity.async_turn_off()
+    coordinator.async_write_state.assert_awaited_once_with(SERIAL, schedule_mode=False)
+
+
+def test_device_metadata_sensor_normalizes_role() -> None:
+    """Optional static metadata can be exposed as diagnostic entities."""
+    coordinator = coordinator_with_status()
+    role_description = next(
+        item for item in DEVICE_SENSORS if item.key == "device_role"
+    )
+    entity = AmbientikaDeviceSensor(coordinator, SERIAL, role_description)
+
+    assert entity.native_value == "master"
