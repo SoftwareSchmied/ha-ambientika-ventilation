@@ -11,6 +11,12 @@ falls back to individual devices for missing packets. Successful device data is
 retained through partial outages, and commands are followed by an immediate
 read-back.
 
+Non-Gemini control and polling are master-oriented, matching the official app's
+zone model. Slave devices remain discoverable for static diagnostics. The
+coordinator is the single enforcement point for device-type mode lists,
+mode-dependent writable fields, schedule/manual exclusion, and the bad-filter
+write lock.
+
 Platforms consume immutable combined device/status models. Their entity unique
 IDs use `<serial>_<entity-key>`; device registry identifiers use
 `(ambientika_ventilation, <serial>)`. These identifiers are compatibility
@@ -20,6 +26,10 @@ New device serials are detected by platform listeners after coordinator
 updates. Optional controls are instantiated only after the corresponding
 capability is observed. Unknown enum values are retained in the model but are
 not emitted as invalid Home Assistant enum states.
+
+The parser deliberately accepts both documented and app-observed wire shapes,
+including numeric/string weekdays, numeric/string enums, legacy role `NC`, and
+both signal-strength spellings.
 
 ## Security boundaries
 

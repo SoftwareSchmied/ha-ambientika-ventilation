@@ -1,28 +1,32 @@
 [build-system]
-requires = ["setuptools>=75"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ha-ambientika-ventilation"
-version = "0.1.0"
-description = "Home Assistant integration for Ambientika ventilation systems"
+version = "0.9.0"
+description = "Unofficial Home Assistant integration for Ambientika ventilation systems"
 readme = "README.md"
-requires-python = ">=3.13"
-license = { text = "MIT" }
-authors = [{ name = "Ambientika Home Assistant contributors" }]
+requires-python = ">=3.14.2"
+license = "MIT"
+authors = [{ name = "SoftwareSchmied" }]
 classifiers = [
+  "Development Status :: 4 - Beta",
   "License :: OSI Approved :: MIT License",
-  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
 ]
 dependencies = []
 
 [project.optional-dependencies]
+security = [
+  "pip-audit==2.10.1",
+]
 test = [
   "homeassistant==2026.8.2",
   "pytest-homeassistant-custom-component==0.13.356",
-  "pytest>=9.0,<10",
-  "pytest-asyncio>=1.0,<2",
-  "pytest-cov>=7.0,<8",
+  "pytest==9.0.3",
+  "pytest-asyncio==1.4.0",
+  "pytest-cov==7.1.0",
   "ruff==0.16.4",
   "mypy==2.3.1",
 ]
@@ -31,13 +35,14 @@ test = [
 packages = []
 
 [tool.pytest.ini_options]
-addopts = "-ra --strict-markers --strict-config --cov=custom_components.ambientika_ventilation --cov-report=term-missing --cov-report=xml"
+addopts = "-ra --strict-markers --strict-config --cov=custom_components.ambientika_ventilation --cov-branch --cov-report=term-missing --cov-report=xml --cov-fail-under=95"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
 
 [tool.coverage.run]
 branch = true
+source = ["custom_components/ambientika_ventilation"]
 
 [tool.coverage.report]
 exclude_also = [
@@ -51,7 +56,7 @@ line-length = 88
 src = ["custom_components", "tests"]
 
 [tool.ruff.lint]
-select = ["B", "D", "E", "F", "I", "RUF", "SIM", "UP"]
+select = ["ASYNC", "B", "D", "E", "F", "I", "RUF", "SIM", "UP"]
 ignore = [
   "ANN401",
   "COM812",
@@ -64,18 +69,7 @@ ignore = [
 
 [tool.mypy]
 python_version = "3.14"
-check_untyped_defs = true
-disallow_any_generics = true
-disallow_incomplete_defs = true
-disallow_untyped_defs = true
-no_implicit_optional = true
-show_error_codes = true
-strict_equality = true
-warn_redundant_casts = true
-warn_return_any = true
-warn_unused_ignores = true
-exclude = ["tests"]
-
-[[tool.mypy.overrides]]
-module = ["homeassistant.*"]
+strict = true
+files = ["custom_components/ambientika_ventilation"]
 ignore_missing_imports = true
+exclude = ["tests"]

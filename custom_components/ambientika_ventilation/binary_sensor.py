@@ -73,7 +73,11 @@ async def async_setup_entry(
 
     @callback
     def add_new_entities() -> None:
-        serials = set(coordinator.data.devices) - known
+        serials = {
+            serial
+            for serial, device_data in coordinator.data.devices.items()
+            if device_data.status is not None
+        } - known
         entities = [
             AmbientikaBinarySensor(coordinator, serial, description)
             for serial in serials

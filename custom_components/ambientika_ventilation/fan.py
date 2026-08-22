@@ -11,8 +11,17 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import AmbientikaRuntimeData
-from .const import FAN_SPEEDS, USER_OPERATING_MODES
+from .const import (
+    USER_OPERATING_MODES,
+    WRITABLE_FAN_SPEEDS,
+    mode_allows_setting,
+    operating_modes_for_device,
+)
 from .entity import AmbientikaEntity
+from .errors import validation_error
+from .models import is_controllable_device
+
+PARALLEL_UPDATES = 1
 
 
 async def async_setup_entry(
@@ -26,7 +35,12 @@ async def async_setup_entry(
 
     @callback
     def add_new_entities() -> None:
-        serials = set(coordinator.data.devices) - known
+        serials = {
+            serial
+            for serial, device_data in coordinator.data.devices.items()
+            if device_data.status is not None
+            and is_controllable_device(device_data.device, device_data.status)
+        } - known
         if serials:
             async_add_entities(AmbientikaFan(coordinator, serial) for serial in serials)
             known.update(serials)
@@ -39,12 +53,6 @@ class AmbientikaFan(AmbientikaEntity, FanEntity):
     """Control power and fan speed for one Ambientika unit."""
 
     _attr_translation_key = "ventilation"
-    _attr_supported_features = (
-        FanEntityFeature.TURN_ON
-        | FanEntityFeature.TURN_OFF
-        | FanEntityFeature.SET_SPEED
-        | FanEntityFeature.PRESET_MODE
-    )
 
     def __init__(self, coordinator: Any, serial: str) -> None:
         """Initialize an Ambientika fan entity."""
@@ -64,11 +72,30 @@ class AmbientikaFan(AmbientikaEntity, FanEntity):
         return len(self._writable_speeds)
 
     @property
+    def supported_features(self) -> FanEntityFeature:
+        """Expose only controls currently enabled by the official app."""
+        status = self.status
+        if (
+            status is None
+            or status.filter_status == "Bad"
+            or status.schedule_state == "On"
+        ):
+            return FanEntityFeature(0)
+        features = (
+            FanEntityFeature.TURN_ON
+            | FanEntityFeature.TURN_OFF
+            | FanEntityFeature.PRESET_MODE
+        )
+        if mode_allows_setting(status.operating_mode, "fan_speed"):
+            features |= FanEntityFeature.SET_SPEED
+        return features
+
+    @property
     def percentage(self) -> int | None:
         """Map the reported fan speed to a Home Assistant percentage."""
         if self.status is None or self.status.fan_speed is None:
             return None
-        if self.status.fan_speed == "Night":
+        if not mode_allows_setting(self.status.operating_mode, "fan_speed"):
             return None
         speeds = self._writable_speeds
         try:
@@ -79,7 +106,7 @@ class AmbientikaFan(AmbientikaEntity, FanEntity):
     @property
     def _writable_speeds(self) -> tuple[str, ...]:
         """Return speeds supported by this status packet."""
-        speeds: tuple[str, ...] = FAN_SPEEDS[:3]
+        speeds: tuple[str, ...] = WRITABLE_FAN_SPEEDS[:3]
         if self.status is not None and self.status.turbo_available:
             speeds += ("Turbo",)
         return speeds
@@ -89,7 +116,7 @@ class AmbientikaFan(AmbientikaEntity, FanEntity):
         """Represent the API's special Night speed as a fan preset."""
         if self.status is None:
             return None
-        if self.status.fan_speed == "Night" or self.status.operating_mode == "Night":
+        if self.status.operating_mode == "Night":
             return "night"
         return None
 
@@ -107,10 +134,15 @@ class AmbientikaFan(AmbientikaEntity, FanEntity):
         if status is None:
             return
         mode = status.operating_mode
-        if mode == "Off":
+        device_type = self.device_data.device.device_type or status.device_type
+        allowed_modes = operating_modes_for_device(device_type)
+        if percentage is not None and not mode_allows_setting(mode, "fan_speed"):
+            mode = "ManualHeatRecovery"
+        elif mode == "Off":
             mode = (
                 status.last_operating_mode
                 if status.last_operating_mode in USER_OPERATING_MODES
+                and status.last_operating_mode in allowed_modes
                 else "ManualHeatRecovery"
             )
         speed = self._speed_for_percentage(percentage) if percentage else None
@@ -129,35 +161,27 @@ class AmbientikaFan(AmbientikaEntity, FanEntity):
         if percentage == 0:
             await self.async_turn_off()
             return
-        status = self.status
-        operating_mode = None
-        if status is not None and status.operating_mode == "Night":
-            operating_mode = (
-                status.last_operating_mode
-                if status.last_operating_mode in USER_OPERATING_MODES
-                and status.last_operating_mode != "Night"
-                else "ManualHeatRecovery"
-            )
         await self.coordinator.async_write_state(
             self._serial,
-            operating_mode=operating_mode,
             fan_speed=self._speed_for_percentage(percentage),
         )
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set the special low-noise Night operating state."""
         if preset_mode != "night":
-            raise ValueError(f"Unsupported preset mode: {preset_mode}")
+            raise validation_error(
+                "unsupported_preset_mode",
+                placeholders={"preset": preset_mode},
+            )
         await self.coordinator.async_write_state(
             self._serial,
             operating_mode="Night",
-            fan_speed="Night",
         )
 
     def _speed_for_percentage(self, percentage: int) -> str:
         """Map 1..100 to the closest supported ordered speed."""
         if not 1 <= percentage <= 100:
-            raise ValueError("Fan percentage must be between 1 and 100")
+            raise validation_error("invalid_fan_percentage")
         speeds = self._writable_speeds
         index = min(len(speeds) - 1, math.ceil(percentage * len(speeds) / 100) - 1)
         return speeds[index]

@@ -24,22 +24,31 @@ class AmbientikaEntity(CoordinatorEntity[AmbientikaCoordinator]):
         """Initialize the entity with stable identifiers."""
         super().__init__(coordinator)
         self._serial = serial
+        self._initial_device_data = coordinator.data.devices[serial]
         self._attr_unique_id = f"{serial}_{entity_key}"
 
     @property
     def device_data(self) -> AmbientikaDeviceData:
         """Return the current combined device data."""
-        return self.coordinator.data.devices[self._serial]
+        return self.coordinator.data.devices.get(
+            self._serial, self._initial_device_data
+        )
 
     @property
     def status(self) -> AmbientikaStatus | None:
         """Return the latest device status."""
-        return self.device_data.status
+        device_data = self.coordinator.data.devices.get(self._serial)
+        return device_data.status if device_data is not None else None
 
     @property
     def available(self) -> bool:
         """Keep last good values, but require at least one successful status."""
-        return super().available and self.status is not None
+        return (
+            super().available
+            and self._serial in self.coordinator.data.devices
+            and self._serial not in self.coordinator.data.failed_devices
+            and self.status is not None
+        )
 
     @property
     def device_info(self) -> DeviceInfo:

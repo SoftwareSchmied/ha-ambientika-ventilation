@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant
 
 from . import AmbientikaConfigEntry
 from .const import INTEGRATION_VERSION
+from .models import is_controllable_device
 
 
 async def async_get_config_entry_diagnostics(
@@ -20,6 +21,7 @@ async def async_get_config_entry_diagnostics(
     devices: list[dict[str, Any]] = []
     for serial, device_data in coordinator.data.devices.items():
         status = device_data.status
+        controllable = is_controllable_device(device_data.device, status)
         devices.append(
             {
                 "redacted_id": _redact_identifier(serial),
@@ -46,7 +48,19 @@ async def async_get_config_entry_diagnostics(
                     ),
                 },
                 "capabilities": {
-                    "fan_control": status is not None and _has_writable_state(status),
+                    "fan_control": (
+                        controllable
+                        and status is not None
+                        and _has_writable_state(status)
+                    ),
+                    "directly_controllable": controllable,
+                    "manual_controls_locked": (
+                        status is not None
+                        and (
+                            status.filter_status == "Bad"
+                            or status.schedule_state == "On"
+                        )
+                    ),
                     "light_sensor": (
                         status is not None
                         and status.light_sensor_level not in (None, "NotAvailable")
@@ -79,6 +93,7 @@ async def async_get_config_entry_diagnostics(
         },
         "supported_resources": [
             "houses_info",
+            "houses",
             "house_devices_status",
             "device_status",
             "schedule",

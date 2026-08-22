@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import voluptuous as vol
@@ -25,6 +26,8 @@ from .const import (
     DOMAIN,
 )
 from .models import parse_houses
+
+LOGGER = logging.getLogger(__name__)
 
 USER_SCHEMA = vol.Schema(
     {
@@ -85,6 +88,7 @@ class AmbientikaConfigFlow(ConfigFlow, domain=DOMAIN):
             except AmbientikaApiError:
                 errors["base"] = "cannot_connect"
             except Exception:
+                LOGGER.exception("Unexpected error validating Ambientika credentials")
                 errors["base"] = "unknown"
             else:
                 await self.async_set_unique_id(f"{DOMAIN}_{data[CONF_USER_ID]}")
@@ -116,8 +120,13 @@ class AmbientikaConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_auth"
             except NoDevicesError:
                 errors["base"] = "no_devices"
+            except AmbientikaResponseError:
+                errors["base"] = "invalid_response"
             except AmbientikaApiError:
                 errors["base"] = "cannot_connect"
+            except Exception:
+                LOGGER.exception("Unexpected error reauthenticating Ambientika")
+                errors["base"] = "unknown"
             else:
                 if data[CONF_USER_ID] != reauth_entry.data.get(CONF_USER_ID):
                     errors["base"] = "wrong_account"

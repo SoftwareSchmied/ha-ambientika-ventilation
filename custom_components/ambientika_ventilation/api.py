@@ -15,12 +15,12 @@ from typing import Any
 from aiohttp import ClientError, ClientResponse, ClientSession
 
 from .const import (
-    FAN_SPEEDS,
     HUMIDITY_LEVELS,
     LIGHT_SENSOR_LEVELS,
     MAX_CONCURRENT_REQUESTS,
     OPERATING_MODES,
     REQUEST_TIMEOUT,
+    WRITABLE_FAN_SPEEDS,
 )
 
 
@@ -165,6 +165,14 @@ class AmbientikaApiClient:
             raise AmbientikaResponseError("Houses response is not a list")
         return payload
 
+    async def async_houses(self) -> list[object]:
+        """Return house-level metadata such as address and timezone."""
+        payload = await self._request("GET", "/House/houses")
+        if not isinstance(payload, list):
+            self.metrics.parser_errors += 1
+            raise AmbientikaResponseError("Houses response is not a list")
+        return payload
+
     async def async_device_status(self, serial_number: str) -> dict[str, Any]:
         """Return the latest status for a device."""
         payload = await self._request(
@@ -217,7 +225,7 @@ class AmbientikaApiClient:
     ) -> None:
         """Validate and send the complete writable device state."""
         _validate_choice("operating mode", operating_mode, OPERATING_MODES)
-        _validate_choice("fan speed", fan_speed, FAN_SPEEDS)
+        _validate_choice("fan speed", fan_speed, WRITABLE_FAN_SPEEDS)
         _validate_choice("humidity level", humidity_level, HUMIDITY_LEVELS)
         _validate_choice("light sensor level", light_sensor_level, LIGHT_SENSOR_LEVELS)
         await self._request(

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import AmbientikaApiClient, AmbientikaToken
@@ -69,3 +70,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: AmbientikaConfigEntry) -
 async def async_unload_entry(hass: HomeAssistant, entry: AmbientikaConfigEntry) -> bool:
     """Unload an Ambientika config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant,
+    entry: AmbientikaConfigEntry,
+    device_entry: dr.DeviceEntry,
+) -> bool:
+    """Allow removal only after a device disappeared from the cloud account."""
+    known_devices = entry.runtime_data.coordinator.data.devices
+    return not any(
+        domain == DOMAIN and identifier in known_devices
+        for domain, identifier in device_entry.identifiers
+    )

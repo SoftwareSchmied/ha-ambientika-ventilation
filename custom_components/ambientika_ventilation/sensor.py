@@ -24,6 +24,7 @@ from .models import AmbientikaDevice, AmbientikaStatus
 
 ValueFn = Callable[[AmbientikaStatus], Any]
 DeviceValueFn = Callable[[AmbientikaDevice], Any]
+DeviceAttributesFn = Callable[[AmbientikaDevice], dict[str, Any]]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -40,6 +41,7 @@ class AmbientikaDeviceSensorDescription(SensorEntityDescription):
 
     value_fn: DeviceValueFn
     enum_values: tuple[str, ...] = ()
+    attributes_fn: DeviceAttributesFn | None = None
 
 
 SENSORS = (
@@ -72,6 +74,13 @@ SENSORS = (
         device_class=SensorDeviceClass.ENUM,
         value_fn=lambda status: status.filter_status,
         enum_values=FILTER_STATUSES,
+    ),
+    AmbientikaSensorDescription(
+        key="packet_type",
+        translation_key="packet_type",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda status: status.packet_type,
     ),
     AmbientikaSensorDescription(
         key="last_operating_mode",
@@ -155,6 +164,19 @@ DEVICE_SENSORS = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda device: device.house_name,
+        attributes_fn=lambda device: _without_none(
+            {
+                "house_id": device.house_id,
+                "address": device.house_address,
+                "latitude": device.house_latitude,
+                "longitude": device.house_longitude,
+                "timezone": device.house_timezone,
+                "iana_timezone": device.house_iana_timezone,
+                "current_house_time": device.house_current_time,
+                "zones_count": device.house_zones_count,
+                "devices_count": device.house_devices_count,
+            }
+        ),
     ),
     AmbientikaDeviceSensorDescription(
         key="zone",
@@ -162,6 +184,9 @@ DEVICE_SENSORS = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda device: device.zone_name,
+        attributes_fn=lambda device: _without_none(
+            {"zone_id": device.zone_id, "zone_index": device.zone_index}
+        ),
     ),
     AmbientikaDeviceSensorDescription(
         key="room",
@@ -169,6 +194,12 @@ DEVICE_SENSORS = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda device: device.room_name,
+        attributes_fn=lambda device: _without_none(
+            {
+                "room_id": device.room_id,
+                "devices_count": device.room_devices_count,
+            }
+        ),
     ),
     AmbientikaDeviceSensorDescription(
         key="device_id",
@@ -192,6 +223,13 @@ DEVICE_SENSORS = (
         value_fn=lambda device: device.room_id,
     ),
     AmbientikaDeviceSensorDescription(
+        key="zone_id",
+        translation_key="zone_id",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.zone_id,
+    ),
+    AmbientikaDeviceSensorDescription(
         key="zone_index",
         translation_key="zone_index",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -199,6 +237,11 @@ DEVICE_SENSORS = (
         value_fn=lambda device: device.zone_index,
     ),
 )
+
+
+def _without_none(values: dict[str, Any]) -> dict[str, Any]:
+    """Remove absent optional metadata from entity attributes."""
+    return {key: value for key, value in values.items() if value is not None}
 
 
 async def async_setup_entry(
@@ -214,7 +257,11 @@ async def async_setup_entry(
 
     @callback
     def add_new_entities() -> None:
-        serials = set(coordinator.data.devices) - known_devices
+        serials = {
+            serial
+            for serial, device_data in coordinator.data.devices.items()
+            if device_data.status is not None
+        } - known_devices
         entities: list[SensorEntity] = [
             AmbientikaSensor(coordinator, serial, description)
             for serial in serials
@@ -290,7 +337,11 @@ class AmbientikaDeviceSensor(AmbientikaEntity, SensorEntity):
     @property
     def available(self) -> bool:
         """Keep metadata available independently of a status packet."""
-        return self.coordinator.last_update_success and self.native_value is not None
+        return (
+            self.coordinator.last_update_success
+            and self._serial in self.coordinator.data.devices
+            and self.native_value is not None
+        )
 
     @property
     def native_value(self) -> Any:
@@ -299,6 +350,12 @@ class AmbientikaDeviceSensor(AmbientikaEntity, SensorEntity):
         if self.entity_description.enum_values:
             return API_TO_HA.get(value)
         return value
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Expose related topology metadata without creating entity clutter."""
+        attributes_fn = self.entity_description.attributes_fn
+        return attributes_fn(self.device_data.device) if attributes_fn else None
 
 
 class AmbientikaScheduleSensor(AmbientikaEntity, SensorEntity):
@@ -326,8 +383,12 @@ class AmbientikaScheduleSensor(AmbientikaEntity, SensorEntity):
             return {}
         return {
             "schedule_id": schedule.schedule_id,
+            "zone_id": schedule.zone_id,
+            "house_id": schedule.house_id,
+            "device_id": schedule.device_id,
             "time_slots": [
                 {
+                    "id": slot.slot_id,
                     "day_of_week": slot.day_of_week,
                     "start_time": slot.start_time,
                     "end_time": slot.end_time,
@@ -335,6 +396,7 @@ class AmbientikaScheduleSensor(AmbientikaEntity, SensorEntity):
                     "fan_speed": slot.fan_speed,
                     "humidity_level": slot.humidity_level,
                     "light_sensor_level": slot.light_sensor_level,
+                    "schedule_id": slot.schedule_id,
                 }
                 for slot in schedule.time_slots
             ],

@@ -21,12 +21,17 @@ def houses_payload() -> list[dict[str, Any]]:
         {
             "houseId": 10,
             "houseName": "Home",
+            "houseZonesCount": 1,
+            "houseDevicesCount": 2,
             "nonGeminiZones": [
                 {
+                    "id": 301,
                     "name": "Ground floor",
                     "rooms": [
                         {
+                            "id": 201,
                             "name": "LivingRoom",
+                            "roomDevicesCount": 1,
                             "devices": [
                                 {
                                     "id": 101,

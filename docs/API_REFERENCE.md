@@ -8,6 +8,7 @@ that every firmware or account supports every field.
 | Resource | Type | Unit / states | Access | Polling | HA platform | Default |
 | --- | --- | --- | --- | --- | --- | --- |
 | `/House/houses-info` | object list | Houses, rooms, zones, devices | Read | Start + 6 h | Device discovery | N/A |
+| `/House/houses` | object list | Address, coordinates, timezone | Read | Start + 6 h | House diagnostic attributes | Disabled |
 | `/Device/house-devices-status` | object | All available house status packets | Read | 60 s | Coordinator batch source | N/A |
 | `/Device/device-status` temperature | integer | °C | Read | 60 s | Sensor | Enabled |
 | `/Device/device-status` humidity | integer | % | Read | 60 s | Sensor | Enabled |
@@ -17,7 +18,7 @@ that every firmware or account supports every field.
 | `/Device/device-status` night alarm | boolean | Day / night | Read | 60 s | Binary sensor | Enabled |
 | `/Device/device-status` schedule | enum | NotAvailable, Off, On | Read | 60 s | Binary sensor | Enabled |
 | `/Device/device-status` signal strength | integer | Vendor raw value | Read | 60 s | Sensor | Disabled |
-| `/Device/change-mode` operating mode | enum | Smart, Auto, Heat Recovery, Night, Away, Surveillance, Timed Extraction, Extraction, Intake, Off | Read/write | On demand + read-back | Select / fan | Enabled |
+| `/Device/change-mode` operating mode | enum | Smart, Auto, Heat Recovery, Night, Away, Surveillance, Timed Extraction, Extraction, Intake, both flow directions, Off | Read/write | On demand + read-back | Select / fan | Enabled |
 | `/Device/change-mode` fan speed | enum | Low, Medium, High, Turbo when available | Read/write | On demand + read-back | Fan | Enabled |
 | `/Device/change-mode` humidity level | enum | Dry, Normal, Moist | Read/write | On demand + read-back | Select | Enabled |
 | `/Device/change-mode` light level | enum | Off, Low, Medium | Read/write when reported | On demand + read-back | Select | Enabled |
@@ -30,6 +31,16 @@ The client additionally knows that HTTP 401 requires authentication recovery,
 403 means unavailable capability, 404 means unsupported resource, 429 requires
 backoff, and 5xx is temporary. Unsupported per-device status endpoints are not
 retried during every polling cycle.
+
+The Android app sends weekday values as `0` (Sunday) through `6` (Saturday),
+while the OpenAPI document declares weekday names. Both forms are accepted.
+Likewise, both the deployed `signalStrenght` spelling and a future corrected
+`signalStrength` field are parsed. `FanSpeed.Night` is retained for reading
+legacy packets but is never written: Night is an operating mode in the app.
+
+Non-Gemini zones are controlled through their master device. Slave units do not
+receive duplicate controls. Gemini devices are individually controlled and use
+the reduced operating-mode set observed in app version 1.5.1.
 
 ## Deliberately excluded writes
 

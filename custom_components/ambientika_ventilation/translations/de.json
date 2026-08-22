@@ -8,6 +8,10 @@
         "data": {
           "username": "E-Mail-Adresse",
           "password": "Passwort"
+        },
+        "data_description": {
+          "username": "E-Mail-Adresse, die in der Ambientika-App registriert ist.",
+          "password": "Passwort des Ambientika-Cloud-Kontos."
         }
       },
       "reauth_confirm": {
@@ -16,6 +20,10 @@
         "data": {
           "username": "E-Mail-Adresse",
           "password": "Passwort"
+        },
+        "data_description": {
+          "username": "E-Mail-Adresse, die in der Ambientika-App registriert ist.",
+          "password": "Aktuelles Passwort des Ambientika-Cloud-Kontos."
         }
       }
     },
@@ -32,6 +40,21 @@
       "reauth_successful": "Die Anmeldung wurde erfolgreich erneuert"
     }
   },
+  "exceptions": {
+    "device_unavailable": { "message": "Für das Lüftungsgerät ist kein lesbarer Zustand verfügbar." },
+    "device_not_controllable": { "message": "Nur Zonen-Mastergeräte können gesteuert werden." },
+    "controls_locked_filter": { "message": "Die Gerätesteuerung ist gesperrt, bis der Filterstatus zurückgesetzt wurde." },
+    "controls_locked_schedule": { "message": "Deaktiviere den Wochenzeitplan, bevor du manuelle Einstellungen änderst." },
+    "unsupported_operating_mode": { "message": "Die Betriebsart {mode} wird von diesem Gerätetyp nicht unterstützt." },
+    "setting_unavailable": { "message": "{setting} kann in der Betriebsart {mode} nicht geändert werden." },
+    "schedule_unsupported": { "message": "Dieses Gerät unterstützt keine Wochenzeitplanung." },
+    "incomplete_writable_state": { "message": "Das Gerät hat keinen vollständigen schreibbaren Zustand gemeldet." },
+    "cloud_command_failed": { "message": "Die Ambientika-Cloud hat den Befehl nicht angenommen." },
+    "filter_reset_failed": { "message": "Der Filterstatus konnte über die Ambientika-Cloud nicht zurückgesetzt werden." },
+    "unsupported_preset_mode": { "message": "Die Lüfter-Voreinstellung {preset} wird nicht unterstützt." },
+    "invalid_fan_percentage": { "message": "Der Lüfterwert muss zwischen 1 und 100 Prozent liegen." },
+    "unsupported_select_option": { "message": "Die Option {option} wird nicht unterstützt." }
+  },
   "entity": {
     "fan": { "ventilation": { "name": "Lüftung", "state_attributes": { "preset_mode": { "state": { "night": "Nacht" } } } } },
     "sensor": {
@@ -40,6 +63,7 @@
       "signal_strength": { "name": "Signalstärke" },
       "air_quality": { "name": "Luftqualität", "state": { "very_good": "Sehr gut", "good": "Gut", "medium": "Mittel", "poor": "Schlecht", "bad": "Sehr schlecht" } },
       "filter_status": { "name": "Filterstatus", "state": { "good": "Gut", "medium": "Bald wechseln", "bad": "Wechseln" } },
+      "packet_type": { "name": "Pakettyp" },
       "last_operating_mode": { "name": "Letzte Betriebsart", "state": { "smart": "Smart", "auto": "Automatik", "heat_recovery": "Wärmerückgewinnung", "night": "Nacht", "away": "Abwesend", "surveillance": "Überwachung", "timed_extraction": "Zeitgesteuerte Abluft", "extraction": "Abluft", "intake": "Zuluft", "master_slave_flow": "Master-zu-Slave-Luftstrom", "slave_master_flow": "Slave-zu-Master-Luftstrom", "off": "Aus" } },
       "device_type": { "name": "Gerätetyp" },
       "device_subtype": { "name": "Geräteuntertyp" },
@@ -54,6 +78,7 @@
       "device_id": { "name": "Cloud-Geräte-ID" },
       "house_id": { "name": "Cloud-Haus-ID" },
       "room_id": { "name": "Cloud-Raum-ID" },
+      "zone_id": { "name": "Cloud-Zonen-ID" },
       "zone_index": { "name": "Zonenindex" },
       "schedule_entries": { "name": "Zeitplaneinträge" }
     },
@@ -64,7 +89,7 @@
       "schedule": { "name": "Zeitplan" }
     },
     "select": {
-      "operating_mode": { "name": "Betriebsart", "state": { "smart": "Smart", "auto": "Automatik", "heat_recovery": "Wärmerückgewinnung", "night": "Nacht", "away": "Abwesend", "surveillance": "Überwachung", "timed_extraction": "Zeitgesteuerte Abluft", "extraction": "Abluft", "intake": "Zuluft", "off": "Aus" } },
+      "operating_mode": { "name": "Betriebsart", "state": { "smart": "Smart", "auto": "Automatik", "heat_recovery": "Wärmerückgewinnung", "night": "Nacht", "away": "Abwesend", "surveillance": "Überwachung", "timed_extraction": "Zeitgesteuerte Abluft", "extraction": "Abluft", "intake": "Zuluft", "master_slave_flow": "Master-zu-Slave-Luftstrom", "slave_master_flow": "Slave-zu-Master-Luftstrom", "off": "Aus" } },
       "humidity_level": { "name": "Feuchteziel", "state": { "dry": "Trocken", "normal": "Normal", "moist": "Feucht" } },
       "light_sensor_level": { "name": "Lichtsensor-Empfindlichkeit", "state": { "off": "Aus", "low": "Niedrig", "medium": "Mittel" } }
     },

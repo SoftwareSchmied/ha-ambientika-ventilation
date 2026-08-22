@@ -11,6 +11,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import AmbientikaRuntimeData
 from .entity import AmbientikaEntity
+from .models import is_controllable_device
+
+PARALLEL_UPDATES = 1
 
 
 async def async_setup_entry(
@@ -29,6 +32,7 @@ async def async_setup_entry(
             for serial, device_data in coordinator.data.devices.items()
             if device_data.status is not None
             and device_data.status.schedule_state not in (None, "NotAvailable")
+            and is_controllable_device(device_data.device, device_data.status)
         } - known
         if serials:
             async_add_entities(

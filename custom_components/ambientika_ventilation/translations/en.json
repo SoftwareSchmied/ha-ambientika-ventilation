@@ -8,6 +8,10 @@
         "data": {
           "username": "Email address",
           "password": "Password"
+        },
+        "data_description": {
+          "username": "Email address registered in the Ambientika app.",
+          "password": "Password for the Ambientika cloud account."
         }
       },
       "reauth_confirm": {
@@ -16,6 +20,10 @@
         "data": {
           "username": "Email address",
           "password": "Password"
+        },
+        "data_description": {
+          "username": "Email address registered in the Ambientika app.",
+          "password": "Current password for the Ambientika cloud account."
         }
       }
     },
@@ -32,6 +40,21 @@
       "reauth_successful": "Authentication was renewed successfully"
     }
   },
+  "exceptions": {
+    "device_unavailable": { "message": "The ventilation unit has no readable state." },
+    "device_not_controllable": { "message": "Only zone master devices can be controlled." },
+    "controls_locked_filter": { "message": "Device controls are locked until the filter status is reset." },
+    "controls_locked_schedule": { "message": "Disable the weekly schedule before changing manual settings." },
+    "unsupported_operating_mode": { "message": "Operating mode {mode} is not supported by this device type." },
+    "setting_unavailable": { "message": "{setting} cannot be changed in {mode} mode." },
+    "schedule_unsupported": { "message": "Weekly scheduling is not supported by this device." },
+    "incomplete_writable_state": { "message": "The device did not report a complete writable state." },
+    "cloud_command_failed": { "message": "The Ambientika cloud did not accept the command." },
+    "filter_reset_failed": { "message": "The filter status could not be reset through the Ambientika cloud." },
+    "unsupported_preset_mode": { "message": "Fan preset {preset} is not supported." },
+    "invalid_fan_percentage": { "message": "Fan percentage must be between 1 and 100." },
+    "unsupported_select_option": { "message": "Option {option} is not supported." }
+  },
   "entity": {
     "fan": { "ventilation": { "name": "Ventilation", "state_attributes": { "preset_mode": { "state": { "night": "Night" } } } } },
     "sensor": {
@@ -40,6 +63,7 @@
       "signal_strength": { "name": "Signal strength" },
       "air_quality": { "name": "Air quality", "state": { "very_good": "Very good", "good": "Good", "medium": "Medium", "poor": "Poor", "bad": "Bad" } },
       "filter_status": { "name": "Filter status", "state": { "good": "Good", "medium": "Replace soon", "bad": "Replace" } },
+      "packet_type": { "name": "Packet type" },
       "last_operating_mode": { "name": "Last operating mode", "state": { "smart": "Smart", "auto": "Automatic", "heat_recovery": "Heat recovery", "night": "Night", "away": "Away", "surveillance": "Surveillance", "timed_extraction": "Timed extraction", "extraction": "Extraction", "intake": "Intake", "master_slave_flow": "Master to slave flow", "slave_master_flow": "Slave to master flow", "off": "Off" } },
       "device_type": { "name": "Device type" },
       "device_subtype": { "name": "Device subtype" },
@@ -54,6 +78,7 @@
       "device_id": { "name": "Cloud device ID" },
       "house_id": { "name": "Cloud house ID" },
       "room_id": { "name": "Cloud room ID" },
+      "zone_id": { "name": "Cloud zone ID" },
       "zone_index": { "name": "Zone index" },
       "schedule_entries": { "name": "Schedule entries" }
     },
@@ -64,7 +89,7 @@
       "schedule": { "name": "Schedule" }
     },
     "select": {
-      "operating_mode": { "name": "Operating mode", "state": { "smart": "Smart", "auto": "Automatic", "heat_recovery": "Heat recovery", "night": "Night", "away": "Away", "surveillance": "Surveillance", "timed_extraction": "Timed extraction", "extraction": "Extraction", "intake": "Intake", "off": "Off" } },
+      "operating_mode": { "name": "Operating mode", "state": { "smart": "Smart", "auto": "Automatic", "heat_recovery": "Heat recovery", "night": "Night", "away": "Away", "surveillance": "Surveillance", "timed_extraction": "Timed extraction", "extraction": "Extraction", "intake": "Intake", "master_slave_flow": "Master to slave flow", "slave_master_flow": "Slave to master flow", "off": "Off" } },
       "humidity_level": { "name": "Humidity target", "state": { "dry": "Dry", "normal": "Normal", "moist": "Moist" } },
       "light_sensor_level": { "name": "Light sensor sensitivity", "state": { "off": "Off", "low": "Low", "medium": "Medium" } }
     },

@@ -11,6 +11,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import AmbientikaRuntimeData
 from .entity import AmbientikaEntity
+from .models import is_controllable_device
+
+PARALLEL_UPDATES = 1
 
 RESET_FILTER = ButtonEntityDescription(
     key="reset_filter",
@@ -29,7 +32,12 @@ async def async_setup_entry(
 
     @callback
     def add_new_entities() -> None:
-        serials = set(coordinator.data.devices) - known
+        serials = {
+            serial
+            for serial, device_data in coordinator.data.devices.items()
+            if device_data.status is not None
+            and is_controllable_device(device_data.device, device_data.status)
+        } - known
         if serials:
             async_add_entities(
                 AmbientikaResetFilterButton(coordinator, serial) for serial in serials
@@ -48,6 +56,14 @@ class AmbientikaResetFilterButton(AmbientikaEntity, ButtonEntity):
     def __init__(self, coordinator: Any, serial: str) -> None:
         """Initialize the button."""
         super().__init__(coordinator, serial, RESET_FILTER.key)
+
+    @property
+    def available(self) -> bool:
+        """Match the app by offering reset only when replacement is due."""
+        status = self.status
+        return (
+            super().available and status is not None and status.filter_status == "Bad"
+        )
 
     async def async_press(self) -> None:
         """Send the reset command and read back actual status."""

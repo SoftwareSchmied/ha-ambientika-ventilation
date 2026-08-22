@@ -1,38 +1,100 @@
-"""Build a deterministic HACS release archive and SHA-256 checksum."""
+"""Build the deterministic HACS release archive."""
 
 from __future__ import annotations
 
+import argparse
 import hashlib
-import shutil
+import json
+import subprocess
+import tomllib
+import zipfile
 from pathlib import Path
-from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "custom_components" / "ambientika_ventilation"
-OUTPUT_DIRECTORY = ROOT / "dist"
-OUTPUT = OUTPUT_DIRECTORY / "ambientika_ventilation.zip"
-CHECKSUM = OUTPUT.with_suffix(".zip.sha256")
-FIXED_TIMESTAMP = (2026, 1, 1, 0, 0, 0)
+COMPONENT = ROOT / "custom_components" / "ambientika_ventilation"
+ARCHIVE_NAME = "ambientika_ventilation.zip"
+CHECKSUM_NAME = f"{ARCHIVE_NAME}.sha256"
+_ZIP_TIMESTAMP = (2020, 1, 1, 0, 0, 0)
 
 
-def build() -> None:
-    """Write an archive whose bytes do not depend on file timestamps."""
-    if OUTPUT_DIRECTORY.exists():
-        shutil.rmtree(OUTPUT_DIRECTORY)
-    OUTPUT_DIRECTORY.mkdir()
+def manifest_version() -> str:
+    """Return and cross-check the integration version."""
+    manifest = json.loads((COMPONENT / "manifest.json").read_text(encoding="utf-8"))
+    version = manifest.get("version")
+    if not isinstance(version, str) or not version:
+        raise ValueError("manifest.json does not contain a valid version")
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    if project.get("project", {}).get("version") != version:
+        raise ValueError("pyproject.toml version does not match the manifest")
+    return version
 
-    with ZipFile(OUTPUT, "w", compression=ZIP_DEFLATED, compresslevel=9) as archive:
-        for path in sorted(SOURCE.rglob("*")):
-            if not path.is_file() or "__pycache__" in path.parts:
-                continue
-            info = ZipInfo(path.relative_to(SOURCE).as_posix(), FIXED_TIMESTAMP)
-            info.compress_type = ZIP_DEFLATED
-            info.external_attr = 0o644 << 16
+
+def component_files() -> tuple[Path, ...]:
+    """Return tracked component files in stable archive order."""
+    result = subprocess.run(
+        ["git", "ls-files", "--", COMPONENT.relative_to(ROOT).as_posix()],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    files = tuple(
+        sorted(
+            ROOT / line
+            for line in result.stdout.splitlines()
+            if line and (ROOT / line).is_file()
+        )
+    )
+    if COMPONENT / "manifest.json" not in files:
+        raise ValueError("tracked integration manifest is missing")
+    return files
+
+
+def build_release(
+    output_dir: Path, *, expected_version: str | None = None
+) -> tuple[Path, Path]:
+    """Create a reproducible component-root ZIP and its SHA-256 checksum."""
+    version = manifest_version()
+    if expected_version is not None and version != expected_version:
+        raise ValueError(
+            f"manifest version {version!r} does not match {expected_version!r}"
+        )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    archive_path = output_dir / ARCHIVE_NAME
+    with zipfile.ZipFile(
+        archive_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
+    ) as archive:
+        for path in component_files():
+            info = zipfile.ZipInfo(
+                path.relative_to(COMPONENT).as_posix(), date_time=_ZIP_TIMESTAMP
+            )
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o100644 << 16
             archive.writestr(info, path.read_bytes(), compresslevel=9)
 
-    digest = hashlib.sha256(OUTPUT.read_bytes()).hexdigest()
-    CHECKSUM.write_text(f"{digest}  {OUTPUT.name}\n", encoding="ascii")
+    digest = hashlib.sha256(archive_path.read_bytes()).hexdigest()
+    checksum_path = output_dir / CHECKSUM_NAME
+    checksum_path.write_text(f"{digest}  {ARCHIVE_NAME}\n", encoding="ascii")
+    return archive_path, checksum_path
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output-dir", type=Path, default=ROOT / "dist")
+    parser.add_argument("--expected-version")
+    return parser
+
+
+def main() -> int:
+    """Build release files from command-line arguments."""
+    args = _parser().parse_args()
+    archive, checksum = build_release(
+        args.output_dir, expected_version=args.expected_version
+    )
+    print(archive)
+    print(checksum)
+    return 0
 
 
 if __name__ == "__main__":
-    build()
+    raise SystemExit(main())
