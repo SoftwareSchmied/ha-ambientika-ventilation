@@ -12,7 +12,6 @@ license = "MIT"
 authors = [{ name = "SoftwareSchmied" }]
 classifiers = [
   "Development Status :: 4 - Beta",
-  "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3.14",
 ]
 dependencies = []
