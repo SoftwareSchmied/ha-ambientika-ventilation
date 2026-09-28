@@ -27,7 +27,7 @@ Ambientika Ventilation discovers the supported devices on an Ambientika
 account and provides monitoring and safe controls without YAML.
 
 > [!IMPORTANT]
-> Version 0.9.0 is a public beta. It has been validated against the live cloud
+> Version 0.9.1 is a public beta. It has been validated against the live cloud
 > API, the official Android app 1.5.1, and two Ambientika Ghost installations.
 > Reports from other device families and firmware versions remain welcome.
 
