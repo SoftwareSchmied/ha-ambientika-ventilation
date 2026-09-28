@@ -47,7 +47,6 @@ BINARY_SENSORS = (
     AmbientikaBinarySensorDescription(
         key="night",
         translation_key="night",
-        device_class=BinarySensorDeviceClass.LIGHT,
         is_on_fn=lambda status: status.night_alarm,
     ),
     AmbientikaBinarySensorDescription(
