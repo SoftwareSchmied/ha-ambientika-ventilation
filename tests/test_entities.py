@@ -248,6 +248,13 @@ def test_binary_sensor_values(description_index: int, expected: bool) -> None:
     assert entity.is_on is expected
 
 
+def test_night_binary_sensor_has_no_light_device_class() -> None:
+    """Night detection must not be presented as light detection."""
+    description = next(item for item in BINARY_SENSORS if item.key == "night")
+
+    assert description.device_class is None
+
+
 def test_entity_availability_tracks_device_failures_and_removal() -> None:
     """A failed or removed device becomes unavailable without losing identity."""
     coordinator = coordinator_with_status()
