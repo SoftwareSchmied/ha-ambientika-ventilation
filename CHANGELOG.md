@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-09-28
+
+- Refine night detection so Home Assistant presents the Ambientika night
+  signal with neutral binary-state wording instead of light-specific wording.
+  Entity IDs and automation states remain unchanged.
+- Validate the integration against Home Assistant 2026.9.1 and refresh the
+  matching Home Assistant test environment.
+- Update Ruff, hassfest, CodeQL, and repository automation dependencies.
+
 ## [0.9.0] - 2026-08-22
 
 - Publish the first public beta.
@@ -28,5 +37,6 @@ All notable changes to this project are documented here. The format follows
 - Add reproducible release archives, HACS/hassfest validation, security checks,
   repository templates, and complete release documentation.
 
-[Unreleased]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/releases/tag/v0.9.0

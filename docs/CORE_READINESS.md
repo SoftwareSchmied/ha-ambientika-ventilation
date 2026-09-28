@@ -45,6 +45,6 @@ After that extraction, a Core contribution also requires:
 6. submitting the icon to `home-assistant/brands` and removing local brand files;
 7. passing the full Core test, hassfest, typing, and review suite.
 
-The PyPI split is deliberately not claimed as complete in version 0.9.0. Until
-it is published and reviewed, this release is production-oriented HACS software,
-not a Core submission artifact.
+The PyPI split is deliberately not claimed as complete in the 0.9.x series.
+Until it is published and reviewed, these releases are production-oriented
+HACS software, not Core submission artifacts.
