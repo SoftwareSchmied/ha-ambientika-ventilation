@@ -94,6 +94,7 @@ SENSORS = (
     AmbientikaSensorDescription(
         key="signal_strength",
         translation_key="signal_strength",
+        state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda status: status.signal_strength,

@@ -17,7 +17,7 @@ that every firmware or account supports every field.
 | `/Device/device-status` humidity alarm | boolean | Clear / problem | Read | 60 s | Binary sensor | Enabled |
 | `/Device/device-status` night alarm | boolean | Day / night | Read | 60 s | Binary sensor | Enabled |
 | `/Device/device-status` schedule | enum | NotAvailable, Off, On | Read | 60 s | Binary sensor | Enabled |
-| `/Device/device-status` signal strength | integer | Vendor raw value | Read | 60 s | Sensor | Disabled |
+| `/Device/device-status` signal strength | integer | Unitless vendor raw value | Read | 60 s | Numeric sensor | Disabled |
 | `/Device/change-mode` operating mode | enum | Smart, Auto, Heat Recovery, Night, Away, Surveillance, Timed Extraction, Extraction, Intake, both flow directions, Off | Read/write | On demand + read-back | Select / fan | Enabled |
 | `/Device/change-mode` fan speed | enum | Low, Medium, High, Turbo when available | Read/write | On demand + read-back | Fan | Enabled |
 | `/Device/change-mode` humidity level | enum | Dry, Normal, Moist | Read/write | On demand + read-back | Select | Enabled |
@@ -37,6 +37,10 @@ while the OpenAPI document declares weekday names. Both forms are accepted.
 Likewise, both the deployed `signalStrenght` spelling and a future corrected
 `signalStrength` field are parsed. `FanSpeed.Night` is retained for reading
 legacy packets but is never written: Night is an operating mode in the app.
+
+The cloud API does not document a physical unit or scale for signal strength,
+and observed values exceed 200. The integration therefore exposes the integer
+as a unitless measurement without presenting it as percent or dBm.
 
 Non-Gemini zones are controlled through their master device. Slave units do not
 receive duplicate controls. Gemini devices are individually controlled and use

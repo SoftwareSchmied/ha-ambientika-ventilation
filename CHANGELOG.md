@@ -11,6 +11,8 @@ All notable changes to this project are documented here. The format follows
 - Refine night detection so Home Assistant presents the Ambientika night
   signal with neutral binary-state wording instead of light-specific wording.
   Entity IDs and automation states remain unchanged.
+- Present the vendor's unitless signal-strength value as a numeric measurement
+  so Home Assistant can display its history as a measurement graph.
 - Validate the integration against Home Assistant 2026.9.1 and refresh the
   matching Home Assistant test environment.
 - Update Ruff, hassfest, CodeQL, and repository automation dependencies.
