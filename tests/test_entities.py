@@ -50,6 +50,7 @@ from custom_components.ambientika_ventilation.switch import (
     async_setup_entry as async_setup_switches,
 )
 from homeassistant.components.fan import FanEntityFeature
+from homeassistant.components.sensor import SensorStateClass
 from homeassistant.exceptions import ServiceValidationError
 
 SERIAL = "AABBCCDDEEFF"
@@ -112,6 +113,23 @@ def test_enum_entities_normalize_api_values() -> None:
     assert operating_mode.current_option == "heat_recovery"
     assert "smart" in operating_mode.options
     assert air_quality.native_value == "good"
+
+
+def test_signal_strength_is_a_unitless_numeric_measurement() -> None:
+    """The undocumented vendor value remains numeric without an invented unit."""
+    coordinator = coordinator_with_status()
+    device_data = coordinator.data.devices[SERIAL]
+    coordinator.data.devices[SERIAL] = replace(
+        device_data,
+        status=replace(device_data.status, signal_strength=231),
+    )
+    description = next(item for item in SENSORS if item.key == "signal_strength")
+    entity = AmbientikaSensor(coordinator, SERIAL, description)
+
+    assert entity.native_value == 231
+    assert description.state_class is SensorStateClass.MEASUREMENT
+    assert description.device_class is None
+    assert description.native_unit_of_measurement is None
 
 
 def test_fan_maps_turbo_percentage() -> None:
