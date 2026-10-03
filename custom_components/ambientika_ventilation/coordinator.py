@@ -19,6 +19,7 @@ from .api import (
     AmbientikaAuthError,
     AmbientikaForbiddenError,
     AmbientikaNotFoundError,
+    AmbientikaResponseError,
 )
 from .const import (
     DEFAULT_SCAN_INTERVAL,
@@ -119,8 +120,12 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             old_status = old_data.devices.get(serial)
             merged[serial] = AmbientikaDeviceData(
                 device=device,
-                status=statuses.get(serial)
-                or (old_status.status if old_status is not None else None),
+                status=(
+                    statuses.get(serial)
+                    or (old_status.status if old_status is not None else None)
+                )
+                if device.role != "NotConfigured"
+                else None,
                 schedule=self._schedules.get(serial)
                 or (old_status.schedule if old_status is not None else None),
             )
@@ -149,6 +154,9 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         except (AmbientikaForbiddenError, AmbientikaNotFoundError, AmbientikaApiError):
             LOGGER.debug("Optional Ambientika house metadata is unavailable")
         self._known_devices = parse_houses(houses, house_metadata)
+        # Retry unsupported endpoints after discovery (normally every six hours),
+        # including devices whose firmware or role changed since the last probe.
+        self._unsupported_status.clear()
         self._last_discovery = datetime.now(UTC)
         feature_flags: dict[str, bool] = {}
         try:
@@ -190,11 +198,11 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         self, old_data: AmbientikaData
     ) -> tuple[dict[str, AmbientikaStatus], set[str]]:
         """Fetch batched house statuses and fall back to individual devices."""
-        eligible_serials = [
+        readable_serials = {
             serial
             for serial, device in self._known_devices.items()
-            if serial not in self._unsupported_status and is_controllable_device(device)
-        ]
+            if device.role != "NotConfigured"
+        }
         house_ids = sorted(
             {
                 device.house_id
@@ -212,18 +220,18 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
                 statuses.update(
                     (serial, status)
                     for serial, status in parse_house_statuses(batch_result).items()
-                    if serial in self._known_devices
+                    if serial in readable_serials and status.has_values
                 )
             elif isinstance(batch_result, AmbientikaAuthError):
                 raise batch_result
 
         self._unsupported_status.difference_update(statuses)
-        serials = [serial for serial in eligible_serials if serial not in statuses]
+        serials = sorted(readable_serials - self._unsupported_status - statuses.keys())
         results = await asyncio.gather(
             *(self._async_fetch_one(serial) for serial in serials),
             return_exceptions=True,
         )
-        failed_devices: set[str] = set(self._unsupported_status)
+        failed_devices = self._unsupported_status & readable_serials
         for serial, device_result in zip(serials, results, strict=True):
             if isinstance(device_result, AmbientikaStatus):
                 statuses[serial] = device_result
@@ -243,7 +251,10 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
     async def _async_fetch_one(self, serial: str) -> AmbientikaStatus:
         """Fetch and parse one device status."""
         payload = await self.api.async_device_status(serial)
-        return parse_status(payload, serial)
+        status = parse_status(payload, serial)
+        if status.serial_number != serial or not status.has_values:
+            raise AmbientikaResponseError("Device status is missing or mismatched")
+        return status
 
     async def async_write_state(
         self,

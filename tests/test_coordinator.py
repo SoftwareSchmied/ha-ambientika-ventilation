@@ -109,10 +109,10 @@ async def test_batch_status_avoids_individual_requests(
     api.async_device_status.assert_not_awaited()
 
 
-async def test_slave_devices_remain_diagnostic_only(
+async def test_slave_devices_receive_individual_status(
     hass, houses_payload, status_payload
 ) -> None:
-    """A non-Gemini slave is discovered but not polled as a zone controller."""
+    """A slave missing from the house batch receives its own read-only status."""
     slave = {
         **houses_payload[0]["nonGeminiZones"][0]["rooms"][0]["devices"][0],
         "id": 103,
@@ -126,6 +126,11 @@ async def test_slave_devices_remain_diagnostic_only(
     api = AsyncMock()
     api.async_houses_info.return_value = houses_payload
     api.async_feature_flags.return_value = {"weeklyScheduler": False}
+    api.async_device_status.return_value = {
+        "deviceSerialNumber": "FFEEDDCCBBAA",
+        "deviceRole": "SlaveEqualMaster",
+        "temperature": 18,
+    }
     api.async_house_devices_status.return_value = {
         "zoneDevicesInfo": [{"statusPacket": status_payload}],
         "geminiDevicesInfo": [
@@ -141,8 +146,8 @@ async def test_slave_devices_remain_diagnostic_only(
 
     data = await coordinator._async_update_data()
 
-    assert data.devices["FFEEDDCCBBAA"].status is None
-    api.async_device_status.assert_not_awaited()
+    assert data.devices["FFEEDDCCBBAA"].status.temperature == 18
+    api.async_device_status.assert_awaited_once_with("FFEEDDCCBBAA")
 
 
 async def test_write_preserves_active_schedule(

@@ -34,7 +34,7 @@ def test_release_metadata_is_consistent() -> None:
     hacs = json.loads((ROOT / "hacs.json").read_text("utf-8"))
 
     assert manifest["version"] == project["project"]["version"]
-    assert manifest["version"] == INTEGRATION_VERSION == "0.9.1"
+    assert manifest["version"] == INTEGRATION_VERSION == "0.9.2-beta.1"
     assert manifest["domain"] == "ambientika_ventilation"
     assert manifest["config_flow"] is True
     assert manifest["iot_class"] == "cloud_polling"
@@ -63,9 +63,11 @@ def test_release_archive_is_deterministic_and_component_rooted(tmp_path) -> None
     """The HACS ZIP is reproducible and contains only integration files."""
     release = _release_module()
     first, first_checksum = release.build_release(
-        tmp_path / "first", expected_version="0.9.1"
+        tmp_path / "first", expected_version="0.9.2-beta.1"
     )
-    second, _ = release.build_release(tmp_path / "second", expected_version="0.9.1")
+    second, _ = release.build_release(
+        tmp_path / "second", expected_version="0.9.2-beta.1"
+    )
 
     assert first.read_bytes() == second.read_bytes()
     digest = hashlib.sha256(first.read_bytes()).hexdigest()

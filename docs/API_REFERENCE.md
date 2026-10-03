@@ -30,7 +30,9 @@ that every firmware or account supports every field.
 The client additionally knows that HTTP 401 requires authentication recovery,
 403 means unavailable capability, 404 means unsupported resource, 429 requires
 backoff, and 5xx is temporary. Unsupported per-device status endpoints are not
-retried during every polling cycle.
+retried during every polling cycle. They are probed again after successful
+device discovery (normally every six hours), and can recover earlier through
+a usable house-batch status packet.
 
 The Android app sends weekday values as `0` (Sunday) through `6` (Saturday),
 while the OpenAPI document declares weekday names. Both forms are accepted.
@@ -45,6 +47,21 @@ as a unitless measurement without presenting it as percent or dBm.
 Non-Gemini zones are controlled through their master device. Slave units do not
 receive duplicate controls. Gemini devices are individually controlled and use
 the reduced operating-mode set observed in app version 1.5.1.
+
+Configured slaves use the same read-only `/Device/device-status` endpoint when
+their packet is absent or empty in `/Device/house-devices-status`. This adds one
+logical request per missing slave per 60-second cycle; existing concurrency and
+retry limits apply. Device-level fields use the same parsers as master fields.
+No master packet is copied into a slave's sensor entities. Missing values remain
+unknown; metadata-only packets are not treated as successful sensor updates.
+The response does not expose a measurement timestamp, so repeated cloud reads
+do not prove that a physical measurement has changed or is fresh.
+
+Slave sensor availability is reported by a community user in
+[issue #11](https://github.com/SoftwareSchmied/ha-ambientika-ventilation/issues/11).
+No raw device payload or firmware matrix was supplied with that report. The
+implementation is covered by synthetic fixtures; validation on additional
+physical master/slave installations remains welcome.
 
 ## Deliberately excluded writes
 
