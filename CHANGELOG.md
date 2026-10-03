@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+- Expose configured slave devices' sensor and binary-sensor readings when the
+  cloud provides device-level status, with per-device fallback after house
+  polling. Slaves remain read-only, including conflicting cloud role reports.
+- Retry unsupported status endpoints after device discovery and recover from
+  per-device outages without interrupting other devices. Reject empty status
+  packets and individual responses identifying another device.
+
 ## [0.9.1] - 2026-09-28
 
 - Refine night detection so Home Assistant presents the Ambientika night

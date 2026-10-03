@@ -92,14 +92,18 @@ Assistant config entry and are never written to logs or diagnostics.
 | Ambientika Gemini | Yes | Yes | Yes | API/app contract; field reports welcome |
 
 Non-Gemini installations are controlled through the master of each ventilation
-zone. Slave devices are retained as diagnostic devices and are never sent
-duplicate commands.
+zone. Configured slave devices also expose their own sensor values when the
+cloud provides them. Slaves remain read-only; use their readings in dashboards
+or as automation triggers for the zone master.
 
 ## Entities
 
 Each controllable zone master or Gemini unit receives the controls below.
-Configured slave units retain their static diagnostic entities without duplicate
-zone controls.
+Configured slave units receive sensor and binary-sensor entities once their
+first usable status arrives, in addition to static diagnostics. They receive
+no fan, select, schedule switch, or filter-reset controls. Available readings
+depend on the device and firmware; missing fields remain unknown. Devices
+marked as not configured during discovery retain only their static diagnostics.
 
 | Platform | Entity | Default |
 | --- | --- | --- |
@@ -146,6 +150,14 @@ and temporary server errors use bounded exponential backoff with jitter. A
 failure of one optional resource or device retains its last good data and does
 not block other devices. Affected entities are marked unavailable until their
 next successful update.
+
+For each configured slave missing from the house batch, polling adds one
+individual status request per 60-second cycle, before any bounded retries.
+Endpoints returning HTTP 403 or 404 are skipped until the next successful
+discovery (normally every six hours), unless a usable house-batch packet arrives
+earlier. Empty status packets and packets identifying another device are not
+used as that device's readings. The API supplies no measurement timestamp, so
+a successful cloud read cannot establish when the unit last measured a value.
 
 Controls send only values documented as writable by the current API and
 confirmed by the official Android app. Every write sends a complete, validated

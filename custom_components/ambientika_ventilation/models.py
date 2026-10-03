@@ -89,6 +89,28 @@ class AmbientikaStatus:
     schedule_state: str | None = None
     turbo_available: bool = False
 
+    @property
+    def has_values(self) -> bool:
+        """Return whether the packet contains any usable dynamic values."""
+        return any(
+            value is not None
+            for value in (
+                self.operating_mode,
+                self.fan_speed,
+                self.humidity_level,
+                self.light_sensor_level,
+                self.temperature,
+                self.humidity,
+                self.air_quality,
+                self.humidity_alarm,
+                self.filter_status,
+                self.night_alarm,
+                self.last_operating_mode,
+                self.signal_strength,
+                self.schedule_state,
+            )
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class AmbientikaTimeSlot:
@@ -384,9 +406,11 @@ def parse_houses(
 def is_controllable_device(
     device: AmbientikaDevice, status: AmbientikaStatus | None = None
 ) -> bool:
-    """Return whether the app treats a device as a directly controlled unit."""
-    role = status.device_role if status and status.device_role else device.role
-    return role not in ("SlaveEqualMaster", "SlaveOppositeMaster", "NotConfigured")
+    """Allow controls only when neither discovery nor status prohibits them."""
+    read_only_roles = ("SlaveEqualMaster", "SlaveOppositeMaster", "NotConfigured")
+    return device.role not in read_only_roles and (
+        status is None or status.device_role not in read_only_roles
+    )
 
 
 def parse_status(payload: object, fallback_serial: str) -> AmbientikaStatus:
