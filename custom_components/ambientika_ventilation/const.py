@@ -8,7 +8,7 @@ from typing import Final
 from homeassistant.const import Platform
 
 DOMAIN: Final = "ambientika_ventilation"
-INTEGRATION_VERSION: Final = "0.9.1"
+INTEGRATION_VERSION: Final = "0.9.2-beta.1"
 DEFAULT_BASE_URL: Final = "https://app.ambientika.eu:4521"
 DEFAULT_SCAN_INTERVAL: Final = timedelta(seconds=60)
 DISCOVERY_INTERVAL: Final = timedelta(hours=6)
