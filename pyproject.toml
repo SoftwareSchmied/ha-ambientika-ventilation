@@ -21,13 +21,13 @@ security = [
   "pip-audit==2.10.1",
 ]
 test = [
-  "homeassistant==2026.9.1",
-  "pytest-homeassistant-custom-component==0.13.364",
+  "homeassistant==2026.9.4",
+  "pytest-homeassistant-custom-component==0.13.367",
   "pytest==9.0.3",
   "pytest-asyncio==1.4.0",
   "pytest-cov==7.1.0",
-  "ruff==0.16.6",
-  "mypy==2.3.1",
+  "ruff==0.16.10",
+  "mypy==2.4.0",
 ]
 
 [tool.setuptools]
