@@ -5,8 +5,10 @@
 2. Run `ruff format --check .`, `ruff check .`, `mypy`, and `pytest`.
 3. Build with `python scripts/build_release.py --expected-version X.Y.Z` and
    verify the generated SHA-256 checksum.
-4. Commit and push the release changes to `main`.
-5. Push an annotated `vX.Y.Z` tag. The release workflow repeats all checks,
+4. Open or update a pull request with the release changes. Merge it into `main`
+   after all required checks pass, then update the local checkout.
+5. Push an annotated `vX.Y.Z` tag pointing to the verified `main` commit.
+   The release workflow repeats all checks,
    validates hassfest/HACS, builds a deterministic component-root archive, and
    publishes the GitHub release.
 

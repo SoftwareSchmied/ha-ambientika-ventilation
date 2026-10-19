@@ -27,9 +27,11 @@ Ambientika Ventilation discovers the supported devices on an Ambientika
 account and provides monitoring and safe controls without YAML.
 
 > [!IMPORTANT]
-> Version 0.9.1 is a public beta. It has been validated against the live cloud
-> API, the official Android app 1.5.1, and two Ambientika Ghost installations.
-> Reports from other device families and firmware versions remain welcome.
+> Version 0.9.2 adds read-only slave sensors. The integration has been validated
+> against the live cloud API, the official Android app 1.5.1, and Ambientika
+> Ghost installations. Initial community testing confirmed slave readings and
+> master controls on Ghost Version160. Longer-term feedback and reports from
+> other device families and firmware versions remain welcome.
 
 ## Quick installation
 
@@ -199,8 +201,8 @@ names, full serial numbers, exact API payloads, and callback URLs are excluded.
 - **Controls are unavailable:** Disable the weekly schedule first. If the
   filter status is `Bad`, replace the filter and use **Reset filter status**.
 
-For a support request, attach downloaded diagnostics—not raw cloud responses,
-tokens, packet captures, or account details.
+For a support request, attach downloaded diagnostics. Keep raw cloud responses,
+tokens, packet captures, and account details private.
 
 ## Supported and unsupported functionality
 
