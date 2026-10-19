@@ -22,8 +22,8 @@ security = [
 ]
 test = [
   "homeassistant==2026.9.4",
-  "pytest-homeassistant-custom-component==0.13.369",
-  "pytest==9.1.1",
+  "pytest-homeassistant-custom-component==0.13.367",
+  "pytest==9.0.3",
   "pytest-asyncio==1.4.0",
   "pytest-cov==7.1.0",
   "ruff==0.16.10",
