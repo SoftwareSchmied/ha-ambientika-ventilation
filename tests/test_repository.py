@@ -65,9 +65,7 @@ def test_release_archive_is_deterministic_and_component_rooted(tmp_path) -> None
     first, first_checksum = release.build_release(
         tmp_path / "first", expected_version="0.9.2"
     )
-    second, _ = release.build_release(
-        tmp_path / "second", expected_version="0.9.2"
-    )
+    second, _ = release.build_release(tmp_path / "second", expected_version="0.9.2")
 
     assert first.read_bytes() == second.read_bytes()
     digest = hashlib.sha256(first.read_bytes()).hexdigest()
