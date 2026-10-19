@@ -6,6 +6,36 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-10-20
+
+- Add read-only sensor and binary-sensor readings for configured slave devices
+  when the cloud provides them. Master controls and existing entity IDs are
+  preserved, including when cloud role information disagrees.
+- Prefer house-wide status polling, with individual requests for devices
+  missing usable readings. Retry unsupported endpoints after discovery and
+  isolate device failures. Reject empty or mismatched status packets.
+- Update the test environment to Home Assistant 2026.9.4 with compatible
+  test plugin 0.13.367 and pytest 9.0.3.
+- Update Ruff to 0.16.10, Mypy to 2.4.0, and the hassfest and CodeQL workflows.
+- Document direct installation from the default HACS catalog.
+- Initial community testing confirmed slave readings and master controls on
+  Ghost Version160. Issue #11 remains open for longer-term feedback.
+
+## [0.9.2-beta.1] - 2026-10-03
+
+- Expose configured slave devices' sensor and binary-sensor readings when the
+  cloud provides device-level status, with per-device fallback after house
+  polling. Slaves remain read-only, including conflicting cloud role reports.
+- Retry unsupported status endpoints after device discovery and recover from
+  per-device outages without interrupting other devices. Reject empty status
+  packets and individual responses identifying another device.
+- Update the test environment to Home Assistant 2026.9.4 and its matching
+  test plugin, retaining pytest 9.0.3 as required by that plugin.
+- Update Ruff and its pre-commit hook to 0.16.9, plus hassfest and CodeQL
+  workflow dependencies. This preview combines PRs #12, #13, #14, and #15.
+- Publish for testing on physical master/slave installations; the maintainer
+  has no slave units and cannot validate their measurements locally.
+
 ## [0.9.1] - 2026-09-28
 
 - Refine night detection so Home Assistant presents the Ambientika night
@@ -39,6 +69,8 @@ All notable changes to this project are documented here. The format follows
 - Add reproducible release archives, HACS/hassfest validation, security checks,
   repository templates, and complete release documentation.
 
-[Unreleased]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.1...v0.9.2
+[0.9.2-beta.1]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.1...v0.9.2-beta.1
 [0.9.1]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/releases/tag/v0.9.0
