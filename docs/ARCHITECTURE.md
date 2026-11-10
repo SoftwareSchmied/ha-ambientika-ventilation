@@ -61,8 +61,9 @@ hidden behind a custom token scheme.
 
 ## Hybrid data model (cloud + local)
 
-Status of the work: `datapoints.py` and `hub.py` are pure Python (no Home
-Assistant imports) and not yet wired into the coordinator or the platforms.
+`datapoints.py` and `hub.py` are pure Python (no Home Assistant imports); the
+setup, the coordinator and the platforms use them as described under
+"Wiring".
 
 Ambientika units are reported by the cloud REST API; a passive local UDP
 broadcast adds the physical state. For every value that exists in both
@@ -171,3 +172,38 @@ serial, house, zone index, role, type) for a Home Assistant `Store`
 result), so UDP frames can be mapped to devices before the first cloud poll.
 The topology is imported at start and saved (delayed) when it changes; the
 file is removed with the config entry.
+
+## Derived data (analytics)
+
+`analytics.py` (engine), `analytics_descriptions.py`, `psychrometrics.py` and
+`weather_input.py` are pure Python. `analytics_manager.AmbientikaAnalytics`
+(one per entry, `runtime_data.analytics`) is the Home Assistant side:
+
+- **Store:** counters live in `.storage/ambientika_ventilation.analytics.<entry
+  id>` (own file, loaded at setup, `async_delay_save` every five minutes while
+  no write is pending, saved on unload, removed with the entry).
+- **Updates:** one pass updates all units (snapshots built with
+  `snapshot_from_values` from `hub.resolve()` plus the zone and the tracker's
+  reversals), then the zone and house totals. Triggers: a coordinator poll
+  listener (`async_add_poll_listener`, called for every successful poll,
+  changed or not, because `always_update=False` silences the regular
+  listeners), the regular listener for command results, every local *change*
+  (`AmbientikaLocal.add_change_listener`, not heartbeats) and a 60 s timer
+  while a unit is on. There is no second poll. Entities subscribe per scope
+  and receive only `Derived.changed`.
+- **Commands:** the coordinator's `command_observer` (a protocol the manager
+  implements) is told about `command_sent` before the request,
+  `command_confirmed` when the read-back matches, `command_rejected` on every
+  failure path and `filter_reset` after an accepted reset. A local change that
+  shows the expected power or coupling (`local_matches`) confirms with
+  `source="local"`. The 60 s timer expires unconfirmed commands.
+- **Outdoor source:** the options select a weather entity or temperature and
+  humidity sensors. State changes (`async_track_state_change_event`) and every
+  pass read the current states (units converted, unavailable clears the
+  input, the entity's `last_reported` gives the age) into `WeatherInput`.
+- **Entities:** `derived_entity.AmbientikaDerivedEntity` plus the thin
+  `AmbientikaDerivedSensor` / `AmbientikaDerivedBinarySensor` classes build
+  everything from the `DerivedDescription`. `analytics.targets(platform)`
+  yields the entities that exist now: it applies the `requires` rules and
+  assigns the device (unit; zone master; house device
+  `(ambientika_ventilation, house_<id>)`).

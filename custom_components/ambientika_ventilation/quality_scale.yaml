@@ -38,10 +38,11 @@ rules:
   docs-removal-instructions:
     status: done
   entity-event-setup:
-    status: exempt
+    status: done
     comment: >-
-      Entities only listen to their coordinator; they register no event
-      subscriptions of their own.
+      Hub-backed and derived entities subscribe in async_added_to_hass and
+      unsubscribe through async_on_remove; the runtime listeners are removed on
+      unload.
   entity-unique-id:
     status: done
   has-entity-name:
@@ -62,6 +63,10 @@ rules:
     status: done
   docs-configuration-parameters:
     status: done
+    comment: >-
+      README sections Local data and Derived data describe every option
+      (polling, local reception, raw variants, outdoor source, filter hours,
+      room volumes).
   docs-installation-parameters:
     status: done
   entity-unavailable:
@@ -72,11 +77,14 @@ rules:
     status: done
   parallel-updates:
     status: done
+    comment: Set on every platform, including the calendar.
   reauthentication-flow:
     status: done
   test-coverage:
     status: done
-    comment: The test suite enforces at least 98 % line and branch coverage.
+    comment: >-
+      The test suite enforces at least 98 % line and branch coverage
+      (--cov-fail-under in pyproject.toml).
 
   # Gold
   devices:
@@ -125,8 +133,12 @@ rules:
   reconfiguration-flow:
     status: done
   repair-issues:
-    status: todo
-    comment: Repair issues for long outages and a rejected token are planned.
+    status: done
+    comment: >-
+      Repair issues for local UDP reception (port cannot be bound, no frames
+      arrive) with the network requirements. A rejected token starts the
+      reauthentication flow instead; a long cloud outage is shown by the cloud
+      reachability entity and not as an issue.
   stale-devices:
     status: done
     comment: >-

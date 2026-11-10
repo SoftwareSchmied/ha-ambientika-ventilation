@@ -224,7 +224,7 @@ with the cloud values:
   which prefers the local value while it is fresh and falls back to the cloud.
   Disabled variants `... (Cloud)` and `... (local)` show the raw sources.
 - New entities: physical direction, physical fan stage, zone coupling,
-  running, last local frame, and a diagnostic data source (`local_udp`,
+  running, last seen (local), and a diagnostic data source (`local_udp`,
   `cloud`, `degraded`, `offline`). The heartbeat age is available, disabled.
 - The fan, its presets and the selects always follow the setting reported by
   the cloud and your last command, never the broadcast. An idle unit in Away
@@ -242,6 +242,9 @@ Options (**Settings → Devices & services → Ambientika → Configure**):
 | Local UDP reception | Automatic (default), On, Off | Automatic listens for up to 60 seconds after each start and only keeps listening if broadcasts of your own units arrive (the result is remembered, an unsuccessful probe is repeated at the next restart). On always listens and creates a repair issue if a port cannot be opened or nothing arrives for five minutes; the issue disappears when frames arrive. Off never listens. |
 | Create raw source variants | Off (default) | Enables the `... (Cloud)` and `... (local)` entities. |
 
+With reception **Off** the local-only entities (direction, fan stage, coupling,
+heartbeat age) and the `... (local)` variants are not created.
+
 Network requirements: the broadcasts must reach Home Assistant. Home Assistant
 OS and Supervised work without changes. A Docker container needs
 `network_mode: host`. Units in another VLAN or subnet need broadcast
@@ -249,6 +252,48 @@ forwarding (for example a UDP broadcast relay or a router rule). The
 integration works with the cloud alone if no broadcast arrives. Diagnostics
 list counters only, without house ids or addresses. See
 [docs/ENTITIES.md](docs/ENTITIES.md) for all entities.
+
+## Derived data
+
+Besides the values of the cloud and the broadcast the integration derives
+about 100 more values: runtimes per mode, fan stage and direction, estimated
+airflow, air volume, power and energy, dew point and absolute humidity, a
+humidity comfort class, filter remaining hours and the date of the next filter
+alarm, the visible automatic actions (humidity exhaust, night reduction, timed
+extraction, Smart behaviour, free cooling, damper), alarm durations, command
+latency statistics, and totals per zone and per house. **Values marked
+"(estimate)" are model results, not measurements:** the units have no power
+meter, flow sensor or heat meter; the figures come from the manual and the
+TUeV SUeD/DIBt test report. The formulas are in
+[docs/DERIVED_DATA.md](docs/DERIVED_DATA.md), all entities in
+[docs/ENTITIES.md](docs/ENTITIES.md). Most are disabled by default; about 22
+enabled values per unit, 5 per zone and 5 per house remain.
+
+The counters (runtimes, energy, filter hours, command statistics) are kept in
+Home Assistant's `.storage` every five minutes and when the integration
+unloads, and continue after a restart. Time while Home Assistant was down is
+never credited.
+
+Options in the same dialog as above (**Configure**):
+
+| Option | Values | Effect |
+| --- | --- | --- |
+| Outdoor weather entity | Any `weather` entity | Outdoor temperature and humidity. Enables recovered heat, ventilation heat loss, drying potential, the "outdoor air would humidify" warning and the outdoor dew point and absolute humidity. Units °C, °F and K are converted; an unavailable entity leaves the values unknown. |
+| Outdoor temperature sensor, outdoor humidity sensor | Any temperature or humidity sensor | Optional. Replace the temperature or the humidity of the weather entity, or work without one. |
+| Filter hours count | Operating hours (default), Powered-on time | Whether the filter hours count only while the fan moves air or whenever the unit is on. |
+| Room volumes (second step) | m³ per unit, listed by unit name | Enables the air change rate of that unit. Leave a unit empty to skip it. |
+
+Values that need a missing precondition are not created: outdoor values need
+an outdoor source, the air change rate a room volume, and the direction-based
+values (cycle counters, Smart behaviour, free cooling, night reduction) need
+the local reception to be on. Changing an option reloads the integration.
+The vendor's embedded weather key is never used; weather data comes only from
+the entities you choose.
+
+Address, coordinates, time zone and house time of the installation are
+available as five separate diagnostic sensors on the "house" device, disabled by
+default. They are never attributes of other entities and never part of the
+diagnostics download.
 
 ## Reliability and cloud usage
 
