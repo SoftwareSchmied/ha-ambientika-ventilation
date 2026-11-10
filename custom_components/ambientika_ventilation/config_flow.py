@@ -16,9 +16,13 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    BooleanSelector,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
 )
 
 from .api import (
@@ -30,12 +34,17 @@ from .api import (
 from .const import (
     CONF_BASE_URL,
     CONF_EXPIRES_AT,
+    CONF_LOCAL_UDP,
+    CONF_RAW_VARIANTS,
     CONF_SCAN_INTERVAL,
     CONF_TOKEN,
     CONF_USER_ID,
     DEFAULT_BASE_URL,
+    DEFAULT_LOCAL_UDP,
+    DEFAULT_RAW_VARIANTS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    LOCAL_UDP_MODES,
     MAX_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
 )
@@ -190,25 +199,33 @@ class AmbientikaConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class AmbientikaOptionsFlow(OptionsFlowWithReload):
-    """Let the user choose how often the cloud is polled."""
+    """Let the user choose the polling interval and the local data options."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Show and store the polling interval; the entry reloads afterwards."""
+        """Show and store the options; the entry reloads afterwards."""
         if user_input is not None:
             return self.async_create_entry(
-                data={CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL])}
+                data={
+                    CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]),
+                    CONF_LOCAL_UDP: user_input[CONF_LOCAL_UDP],
+                    CONF_RAW_VARIANTS: bool(user_input[CONF_RAW_VARIANTS]),
+                }
             )
 
-        current = self.config_entry.options.get(
-            CONF_SCAN_INTERVAL, int(DEFAULT_SCAN_INTERVAL.total_seconds())
-        )
+        options = self.config_entry.options
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_SCAN_INTERVAL, default=current): NumberSelector(
+                    vol.Required(
+                        CONF_SCAN_INTERVAL,
+                        default=options.get(
+                            CONF_SCAN_INTERVAL,
+                            int(DEFAULT_SCAN_INTERVAL.total_seconds()),
+                        ),
+                    ): NumberSelector(
                         NumberSelectorConfig(
                             min=MIN_SCAN_INTERVAL,
                             max=MAX_SCAN_INTERVAL,
@@ -216,7 +233,21 @@ class AmbientikaOptionsFlow(OptionsFlowWithReload):
                             unit_of_measurement="s",
                             mode=NumberSelectorMode.BOX,
                         )
-                    )
+                    ),
+                    vol.Required(
+                        CONF_LOCAL_UDP,
+                        default=options.get(CONF_LOCAL_UDP, DEFAULT_LOCAL_UDP),
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=list(LOCAL_UDP_MODES),
+                            mode=SelectSelectorMode.DROPDOWN,
+                            translation_key=CONF_LOCAL_UDP,
+                        )
+                    ),
+                    vol.Required(
+                        CONF_RAW_VARIANTS,
+                        default=options.get(CONF_RAW_VARIANTS, DEFAULT_RAW_VARIANTS),
+                    ): BooleanSelector(),
                 }
             ),
         )

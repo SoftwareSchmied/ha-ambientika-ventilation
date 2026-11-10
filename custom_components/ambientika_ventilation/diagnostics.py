@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -9,6 +10,7 @@ from homeassistant.helpers.device_registry import DeviceEntry
 
 from . import AmbientikaConfigEntry
 from .const import DOMAIN, INTEGRATION_VERSION
+from .hub import AmbientikaHub, DeviceLiveness
 from .models import is_controllable_device, turbo_usable
 
 
@@ -140,6 +142,8 @@ async def async_get_config_entry_diagnostics(
             "refreshes": runtime.api.metrics.token_refreshes,
         },
         "request_metrics": runtime.api.metrics.as_dict(),
+        "hub": _hub_diagnostics(runtime.hub),
+        "local_udp": runtime.local.diagnostics(),
         "devices": devices,
     }
 
@@ -199,6 +203,58 @@ async def async_get_device_diagnostics(
         "schedule_entries": (
             len(device_data.schedule.time_slots) if device_data.schedule else None
         ),
+        "liveness": _liveness(entry.runtime_data.hub.liveness(serial)),
+    }
+
+
+def _liveness(liveness: DeviceLiveness | None) -> dict[str, Any] | None:
+    """Return the data source state of one device without identifiers."""
+    if liveness is None:
+        return None
+    return {
+        "data_source": liveness.data_source,
+        "local_freshness": liveness.local_freshness.value,
+        "local_age_s": _rounded(liveness.local_age_s),
+        "local_engaged": liveness.local_engaged,
+        "cloud_reachable": liveness.cloud_reachable,
+        "cloud_age_s": _rounded(liveness.cloud_age_s),
+        "conflicts": liveness.conflicts,
+        "in_conflict": liveness.in_conflict,
+    }
+
+
+def _rounded(value: float | None) -> float | None:
+    return None if value is None else round(value, 1)
+
+
+def _hub_diagnostics(hub: AmbientikaHub) -> dict[str, Any]:
+    """Return the merged-data state: no house id, no addresses, masked serials."""
+    health = hub.cloud_health
+    now = time.monotonic()
+
+    def since(at: float | None) -> float | None:
+        return None if at is None else round(max(now - at, 0.0), 1)
+
+    return {
+        "cloud_reachable": hub.cloud_reachable(),
+        "cloud_health": {
+            "consecutive_failures": health.consecutive_failures,
+            "last_failure_kind": health.last_failure_kind,
+            "failures_by_kind": dict(health.failures_by_kind),
+            "requests_total": health.requests_total,
+            "failures_total": health.failures_total,
+            "success_rate": _rounded(health.success_rate),
+            "last_latency_s": _rounded(health.last_latency_s),
+            "seconds_since_success": since(health.last_success_at),
+            "seconds_since_failure": since(health.last_failure_at),
+            "seconds_since_change": since(health.last_change_at),
+        },
+        "unmapped_local_zones": len(hub.unmapped_zones()),
+        "devices": [
+            {"redacted_id": _redact_identifier(serial), **(_liveness(live) or {})}
+            for serial in sorted(hub.serials)
+            for live in (hub.liveness(serial),)
+        ],
     }
 
 
