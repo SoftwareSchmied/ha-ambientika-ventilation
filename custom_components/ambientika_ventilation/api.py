@@ -732,10 +732,7 @@ def _payload_text(payload: object) -> str:
     """Return all text of an error body in lower case, for keyword checks."""
     if payload is None:
         return ""
-    try:
-        return json.dumps(payload, ensure_ascii=False).casefold()
-    except (TypeError, ValueError):
-        return str(payload).casefold()
+    return json.dumps(payload, ensure_ascii=False).casefold()
 
 
 def _trace_id(payload: object) -> str | None:
@@ -800,15 +797,18 @@ def _http_error(
         return AmbientikaNotFoundError(
             "Ambientika resource is not supported", status=status, trace_id=trace_id
         )
-    if status == 400 and context == CONTEXT_SCHEDULE_WRITE:
-        # The official app reads every HTTP 400 on time slots as an overlap;
-        # an answer that names a different problem stays a plain rejection.
-        if "overlap" in _payload_text(payload) or not _payload_text(payload):
-            return AmbientikaScheduleOverlapError(
-                "Ambientika rejected the time slot because it overlaps another",
-                status=status,
-                trace_id=trace_id,
-            )
+    # The official app reads every HTTP 400 on time slots as an overlap; an
+    # answer that names a different problem stays a plain rejection.
+    if (
+        status == 400
+        and context == CONTEXT_SCHEDULE_WRITE
+        and ("overlap" in (body := _payload_text(payload)) or not body)
+    ):
+        return AmbientikaScheduleOverlapError(
+            "Ambientika rejected the time slot because it overlaps another",
+            status=status,
+            trace_id=trace_id,
+        )
     if status == 406 and context in (CONTEXT_COMMAND, CONTEXT_SCHEDULE_WRITE):
         return AmbientikaDeviceOfflineError(
             "Ambientika device did not respond", status=status, trace_id=trace_id

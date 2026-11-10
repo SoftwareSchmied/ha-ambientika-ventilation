@@ -123,6 +123,7 @@ marked as not configured during discovery retain only their static diagnostics.
 | Binary sensor | Cloud connection (diagnostic, stays available while a unit is offline) | Enabled |
 | Switch | Schedule control | Enabled when supported |
 | Button | Reset filter status | Available when replacement is due |
+| Calendar | Weekly schedule (editable when supported) | Enabled when a schedule exists |
 | Sensor | Signal strength | Disabled |
 | Sensor | Last operating mode | Disabled |
 | Sensor | Weekly schedule entries and details | Disabled when available |
@@ -140,6 +141,58 @@ where the app enables them. Manual controls are locked while a weekly schedule
 is active and while the filter status is `Bad`; schedule deactivation and filter
 reset remain available. The two airflow-direction modes are offered only for
 non-Gemini units, while Gemini units also omit Away mode.
+
+## Schedules
+
+Units that report a weekly schedule get a calendar entity named "Schedule".
+Every time slot of the schedule appears as a weekly recurring event in the
+house time zone, with the operating mode, fan speed and humidity target in the
+title. Units whose schedule state is `NotAvailable` (the common case when no
+schedule was ever created in the Ambientika app) get no calendar.
+
+**Editing.** The calendar is editable when the account has the weekly scheduler
+feature and the unit reports a schedule. Otherwise it is read-only and the
+actions below fail with a clear message. A time slot always lies within one day,
+starts before it ends, has zero seconds and must not overlap another slot of
+the same day. Fan speed `Night` is never written; Turbo only when the unit
+allows it.
+
+*Through the calendar.* Create, edit or delete events in the calendar card. Only
+events that repeat weekly on their own weekday, without end date, count or
+interval, can be stored; anything else, all-day events and changes to a single
+occurrence are rejected with an explanation. Write the operating mode as the
+title (for example `Night`), and optionally the other fields in the description:
+
+```text
+operating_mode: heat_recovery
+fan_speed: medium
+humidity_level: normal
+light_sensor_level: off
+```
+
+*Through actions* (target the calendar entity or the device):
+
+| Action | Purpose |
+| --- | --- |
+| `ambientika_ventilation.set_time_slot` | Create a slot (`day`, `start`, `end`, `operating_mode` required) or change one (`slot_id`). Unspecified values default to low speed, normal humidity, light sensor off on creation and stay unchanged on update. |
+| `ambientika_ventilation.delete_time_slot` | Delete one slot by `slot_id`. |
+| `ambientika_ventilation.clear_schedule` | Delete every slot; needs `confirm: true`. |
+| `ambientika_ventilation.get_schedule` | Response-only: returns the slots with their `slot_id`. |
+
+```yaml
+action: ambientika_ventilation.set_time_slot
+target:
+  entity_id: calendar.living_room_schedule
+data:
+  day: monday
+  start: "22:00:00"
+  end: "23:30:00"
+  operating_mode: night
+```
+
+The write endpoints come from the official app and are not yet verified against
+a unit with an active schedule. Please report unexpected rejections with the
+diagnostics download.
 
 ## Reliability and cloud usage
 
@@ -244,7 +297,7 @@ tokens, packet captures, and account details private.
 
 Supported API resources and data contracts are listed in
 [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md). Device factory reset, account
-management, house/zone reconfiguration, schedules, and firmware operations are
+management, house/zone reconfiguration, and firmware operations are
 deliberately not exposed. Local TCP control is a separate architecture and is
 not part of this cloud integration.
 

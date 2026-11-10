@@ -1244,6 +1244,10 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             else DEFAULT_LIGHT_SENSOR_LEVEL
         )
         return {
+            "day_of_week": None,
+            "start_time": None,
+            "end_time": None,
+            "operating_mode": None,
             "allowed_modes": operating_modes_for_device(device_data.device.device_type),
             "allow_turbo": turbo_usable(status, self._feature_flags),
             "fan_speed": DEFAULT_FAN_SPEED,

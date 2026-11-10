@@ -6,11 +6,8 @@ from datetime import datetime, timedelta, tzinfo
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.components.calendar import (
-    CalendarEntity,
-    CalendarEntityFeature,
-    CalendarEvent,
-)
+from homeassistant.components.calendar import CalendarEntity, CalendarEvent
+from homeassistant.components.calendar.const import CalendarEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, SupportsResponse, callback
 from homeassistant.helpers import config_validation as cv
@@ -59,7 +56,7 @@ FIELD_OPTIONS: dict[str, tuple[str, ...]] = {
     "operating_mode": OPERATING_MODES,
     "fan_speed": WRITABLE_FAN_SPEEDS,
     "humidity_level": HUMIDITY_LEVELS,
-    "light_sensor_level": LIGHT_SENSOR_LEVELS,
+    "light_sensor_level": LIGHT_SENSOR_LEVELS[1:],
 }
 SLOT_ID = vol.All(vol.Coerce(int), vol.Range(min=1))
 SET_TIME_SLOT_SCHEMA = vol.Schema(
@@ -163,8 +160,6 @@ class AmbientikaScheduleCalendar(AmbientikaEntity, CalendarEntity):
         language = self.hass.config.language if self.hass else "en"
         events: list[CalendarEvent] = []
         for slot, begin, finish in expand_slots(self._slots, self._zone, start, end):
-            interval = slot_interval(slot)
-            assert interval is not None  # noqa: S101 - expand_slots skips others
             events.append(
                 CalendarEvent(
                     start=begin,
@@ -173,7 +168,7 @@ class AmbientikaScheduleCalendar(AmbientikaEntity, CalendarEntity):
                     description=event_description(slot),
                     uid=str(slot.slot_id) if slot.slot_id is not None else None,
                     recurrence_id=begin.isoformat(),
-                    rrule=weekly_rrule(interval[0]),
+                    rrule=weekly_rrule((begin.weekday() + 1) % 7),
                 )
             )
         return events
@@ -210,7 +205,9 @@ class AmbientikaScheduleCalendar(AmbientikaEntity, CalendarEntity):
         return {"day_of_week": day, "start_time": start.time(), "end_time": end.time()}
 
     @staticmethod
-    def _reject_instance(recurrence_id: str | None, recurrence_range: str | None) -> None:
+    def _reject_instance(
+        recurrence_id: str | None, recurrence_range: str | None
+    ) -> None:
         """Only a whole weekly series maps to a time slot, never one occurrence."""
         if recurrence_id is not None or recurrence_range is not None:
             raise validation_error("calendar_recurrence_unsupported")
@@ -227,9 +224,7 @@ class AmbientikaScheduleCalendar(AmbientikaEntity, CalendarEntity):
             if "operating_mode" not in settings:
                 raise ScheduleValidationError("calendar_event_mode_missing")
         except ScheduleValidationError as err:
-            raise validation_error(
-                err.code, placeholders=err.placeholders
-            ) from err
+            raise validation_error(err.code, placeholders=err.placeholders) from err
         await self.coordinator.async_create_time_slot(
             self._serial, **fields, **settings
         )
@@ -256,9 +251,7 @@ class AmbientikaScheduleCalendar(AmbientikaEntity, CalendarEntity):
                 parse_event_settings(event.get("summary"), event.get("description"))
             )
         except ScheduleValidationError as err:
-            raise validation_error(
-                err.code, placeholders=err.placeholders
-            ) from err
+            raise validation_error(err.code, placeholders=err.placeholders) from err
         await self.coordinator.async_update_time_slot(self._serial, slot_id, **fields)
 
     async def async_delete_event(
@@ -294,7 +287,7 @@ class AmbientikaScheduleCalendar(AmbientikaEntity, CalendarEntity):
             )
             return
         if any(
-            values[key] is None
+            values.get(key) is None
             for key in ("day_of_week", "start_time", "end_time", "operating_mode")
         ):
             raise validation_error("time_slot_incomplete")

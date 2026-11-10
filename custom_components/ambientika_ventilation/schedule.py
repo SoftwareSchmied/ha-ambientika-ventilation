@@ -137,9 +137,9 @@ def parse_clock(value: object) -> time | None:
         part.isascii() and part.isdigit() for part in parts
     ):
         return None
-    numbers = [int(part) for part in parts]
+    hour, minute, second = (int(part) for part in (*parts, "0")[:3])
     try:
-        return time(*numbers)
+        return time(hour, minute, second)
     except ValueError:
         return None
 
@@ -305,10 +305,15 @@ def expand_slots(
         for slot, clock_start, clock_end in by_day.get(api_day, ()):
             begin = _wall_clock(day, clock_start, zone)
             finish = _wall_clock(day, clock_end, zone)
-            if begin < finish and begin < end and finish > start:
+            # Compare instants: datetimes sharing a zone compare by wall clock.
+            if (
+                begin.astimezone(UTC) < finish.astimezone(UTC)
+                and begin.astimezone(UTC) < end
+                and finish.astimezone(UTC) > start
+            ):
                 result.append((slot, begin, finish))
         day += timedelta(days=1)
-    result.sort(key=lambda item: (item[1], item[0].slot_id or 0))
+    result.sort(key=lambda item: (item[1].astimezone(UTC), item[0].slot_id or 0))
     return result
 
 
