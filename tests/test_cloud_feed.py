@@ -160,19 +160,41 @@ async def test_command_sets_the_expected_value_until_the_cloud_confirms(hass) ->
         "humidityLevel": "Normal",
         "lightSensorLevel": "Low",
     }
-    with patch.object(hub, "set_expected", wraps=hub.set_expected) as expected:
+    with (
+        patch.object(hub, "set_expected", wraps=hub.set_expected) as expected,
+        patch.object(
+            hub, "update_cloud_status", wraps=hub.update_cloud_status
+        ) as confirmed,
+    ):
         await coordinator.async_write_state("serial", operating_mode="Off")
 
     assert expected.call_args.args[0] == "serial"
     assert expected.call_args.args[1]["operating_mode"] == "Off"
     assert expected.call_args.kwargs == {"ttl": EXPECTED_COMMAND_TTL}
-    power = hub.resolve("serial", "power")
-    assert (power.value, power.source) == (False, Source.EXPECTED)
-
-    # The next poll that shows the new state removes the expectation.
-    hub.update_cloud(coordinator.data)
+    # The matching read-back reaches the hub at once and replaces the
+    # expectation, without waiting for the next poll.
+    assert confirmed.call_args.args[0] == "serial"
     power = hub.resolve("serial", "power")
     assert (power.value, power.source) == (False, Source.CLOUD)
+
+
+async def test_unconfirmed_command_keeps_the_expected_value(hass) -> None:
+    coordinator, api = writable(hass)
+    hub = coordinator.hub
+    # The cloud still reports the old mode: the read-back does not match.
+    api.async_device_status.side_effect = lambda serial: {
+        "deviceSerialNumber": serial,
+        "operatingMode": "Auto",
+        "fanSpeed": "Low",
+        "humidityLevel": "Normal",
+        "lightSensorLevel": "Low",
+    }
+    with patch.object(hub, "update_cloud_status") as confirmed:
+        await coordinator.async_write_state("serial", operating_mode="Off")
+
+    confirmed.assert_not_called()
+    power = hub.resolve("serial", "power")
+    assert (power.value, power.source) == (False, Source.EXPECTED)
 
 
 @pytest.mark.parametrize(

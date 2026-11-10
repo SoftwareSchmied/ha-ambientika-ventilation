@@ -271,3 +271,16 @@ def test_expires_within_handles_missing_and_invalid_values() -> None:
     assert _expires_within("invalid", margin) is True
     assert _expires_within(expiry_in(5), margin) is True
     assert _expires_within(expiry_in(60), margin) is False
+
+
+async def test_failed_renewal_keeps_the_current_token() -> None:
+    """A renewal that cannot sign in again must not discard the valid token."""
+    client = make_client([FakeResponse(401), FakeResponse(401)])
+    client._expires_at = expiry_in(5)
+    token = client._token
+    assert token is not None
+
+    with pytest.raises(AmbientikaAuthError):
+        await client.async_renew_token_if_due(timedelta(days=30))
+
+    assert client._token == token

@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from custom_components.ambientika_ventilation.const import DOMAIN
 from custom_components.ambientika_ventilation.datapoints import Source
+from custom_components.ambientika_ventilation.local.models import Freshness
 from custom_components.ambientika_ventilation.local_manager import (
     PROBE_DETECTED,
     PROBE_NOTHING,
@@ -330,3 +331,21 @@ async def test_stop_without_start_is_safe(hass) -> None:
     manager, *_ = build(hass, {"local_udp": "off"})
     await manager.async_stop()
     assert manager.diagnostics()["seconds_since_last_frame"] is None
+
+
+async def test_watchdog_reports_are_not_counted_as_frames(hass) -> None:
+    """STALE/LOST reports from the listener timer keep the silence timer running."""
+    with fake_listeners():
+        manager, _hub, clock, coordinator, _entry = build(hass, {"local_udp": "on"})
+        await manager.async_start()
+        (listener,) = FakeListener.instances
+        listener.on_state(local(clock, n=1), True)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        last_frame = manager._last_frame_at
+        refreshes = coordinator.async_request_refresh.await_count
+
+        clock.advance(90)
+        listener.on_state(local(clock, n=1, freshness=Freshness.STALE), True)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        assert manager._last_frame_at == last_frame
+        assert coordinator.async_request_refresh.await_count == refreshes

@@ -607,3 +607,20 @@ def test_fake_clock_default_uses_monotonic() -> None:
     hub.update_cloud(cloud(device()))
     assert hub.resolve(MASTER, "power").value is True
     assert isinstance(FakeClock().wall().year, int)
+
+
+def test_single_status_from_a_read_back_confirms_the_expected_value() -> None:
+    hub, clock = start("Off")
+    hub.set_expected(MASTER, {"operating_mode": "ManualHeatRecovery"})
+    assert hub.resolve(MASTER, "operating_mode").source is Source.EXPECTED
+
+    clock.advance(3)
+    read_back = cloud(device(mode="ManualHeatRecovery")).devices[MASTER].status
+    hub.update_cloud_status(MASTER, read_back)
+    resolved = hub.resolve(MASTER, "operating_mode")
+    assert (resolved.value, resolved.source) == ("ManualHeatRecovery", Source.CLOUD)
+
+    # Unknown devices and missing statuses are ignored.
+    hub.update_cloud_status("unknown", read_back)
+    hub.update_cloud_status(MASTER, None)
+    assert hub.resolve(MASTER, "operating_mode").value == "ManualHeatRecovery"

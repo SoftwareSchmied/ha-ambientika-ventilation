@@ -24,6 +24,10 @@ UDP_BASE_PORT = 45000
 UDP_SOURCE_BASE_PORT = 46000
 UDP_HEARTBEAT_INTERVAL = 26.97
 """Measured master heartbeat period in seconds (±1 s)."""
+LOCAL_STALE_AFTER = 3 * UDP_HEARTBEAT_INTERVAL
+"""Age in seconds from which a zone is STALE (~81 s); shared by tracker and hub."""
+LOCAL_LOST_AFTER = 300.0
+"""Age in seconds from which a zone is LOST; shared by tracker and hub."""
 
 
 class Coupling(StrEnum):

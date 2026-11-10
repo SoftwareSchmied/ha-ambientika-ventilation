@@ -51,8 +51,10 @@ All notable changes to this project are documented here. The format follows
   source; disabled by default: the `_cloud`/`_local` variants and the heartbeat
   age. New "Ambientika cloud" device with cloud reachability and request health
   diagnostics. Controls and selects keep following the cloud setting.
-- The device placement is cached in `.storage` so local frames can be mapped
-  before the first poll; the cache is removed with the config entry.
+- The device placement is cached in `.storage`; the cache is removed with the
+  config entry. Setup still needs one successful cloud poll: when the cloud is
+  unreachable at startup, Home Assistant retries the setup as before. Starting
+  from the cache alone is planned for a later release.
 - Diagnostics include hub and listener counters (serials masked, no house id,
   no addresses).
 - Local power only claims "on" for moving air or a non-idle coupling (an idle

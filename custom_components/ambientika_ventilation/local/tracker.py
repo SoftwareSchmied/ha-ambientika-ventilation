@@ -10,16 +10,17 @@ from typing import Any
 
 from .decoder import RejectReason
 from .models import (
-    UDP_HEARTBEAT_INTERVAL,
+    LOCAL_LOST_AFTER,
+    LOCAL_STALE_AFTER,
     Direction,
     Freshness,
     LocalZoneState,
     UdpFrame,
 )
 
-STALE_AFTER = 3 * UDP_HEARTBEAT_INTERVAL
+STALE_AFTER = LOCAL_STALE_AFTER
 """Age in seconds from which a zone is STALE (~81 s)."""
-LOST_AFTER = 300.0
+LOST_AFTER = LOCAL_LOST_AFTER
 """Age in seconds from which a zone is LOST."""
 RATE_LIMIT_FRAMES = 10
 RATE_LIMIT_WINDOW = 10.0
@@ -150,7 +151,7 @@ class UdpZoneTracker:
         if (
             entry.pinned_host is not None
             and frame.source_host != entry.pinned_host
-            and now - entry.last_received < self._lost_after
+            and now - entry.last_received < self._stale_after
         ):
             return self._reject(RejectReason.SENDER_PINNED, zone)
         recent = entry.recent

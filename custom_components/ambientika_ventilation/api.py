@@ -331,7 +331,8 @@ class AmbientikaApiClient:
             try:
                 await self.async_refresh_token()
             except AmbientikaAuthError:
-                self._token = None
+                # Keep the current token: it is usually valid for weeks and
+                # stays in use if signing in again is impossible or fails.
                 await self.async_authenticate()
             return True
 

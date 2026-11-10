@@ -257,10 +257,19 @@ class AmbientikaCloudEntity(Entity):
             entry_type=DeviceEntryType.SERVICE,
         )
 
+    _last_written: object = None
+
     async def async_added_to_hass(self) -> None:
         """Follow reachability and counters of the cloud."""
+        self._last_written = self.state
         self.async_on_remove(self._hub.subscribe_hub(self._on_hub))
 
     @callback
     def _on_hub(self, _reachable: bool, _health: CloudHealth) -> None:
+        # The hub notifies on every health change (counters move each poll);
+        # write only when this entity's own state changed.
+        state = self.state
+        if state == self._last_written:
+            return
+        self._last_written = state
         self.async_write_ha_state()

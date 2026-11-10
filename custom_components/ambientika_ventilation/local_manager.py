@@ -38,7 +38,7 @@ from .const import (
 from .coordinator import AmbientikaCoordinator
 from .hub import AmbientikaHub
 from .local.listener import AmbientikaUdpListener, UdpBindError, probe
-from .local.models import LocalZoneState
+from .local.models import Freshness, LocalZoneState
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -221,6 +221,9 @@ class AmbientikaLocal:
 
     def _on_state(self, state: LocalZoneState, changed: bool) -> None:
         serials = self._hub.update_local(state)
+        if state.freshness is not Freshness.FRESH:
+            # Watchdog report (STALE/LOST) from the listener timer, not a frame.
+            return
         self._last_frame_at = self._clock()
         self._clear_issues()
         if changed and serials:
@@ -312,11 +315,13 @@ class AmbientikaLocal:
         ir.async_delete_issue(self._hass, DOMAIN, self._issue_id(issue))
 
     def _clear_issues(self) -> None:
-        if self._bind_issue or self._no_frames_issue:
-            self._delete_issue(ISSUE_LOCAL_UDP_BIND)
+        """Resolve the no-frames issue; the bind issue only once all ports bind."""
+        if self._no_frames_issue:
             self._delete_issue(ISSUE_LOCAL_UDP_NO_FRAMES)
-        self._bind_issue = False
-        self._no_frames_issue = False
+            self._no_frames_issue = False
+        if self._bind_issue and not self._failed_ports():
+            self._delete_issue(ISSUE_LOCAL_UDP_BIND)
+            self._bind_issue = False
 
     # ------------------------------------------------------------ diagnostics
 

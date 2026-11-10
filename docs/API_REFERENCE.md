@@ -147,7 +147,8 @@ stopped while reversing.
 Frames are accepted only when the length is 7, the header is `0x65`, the zone
 nibble matches the destination port and the source port is `46000 + zone`, the
 house id and zone are configured, and the sender host is the one pinned for the
-zone (a new host is accepted only after the zone was lost for 5 minutes). More
+zone (a new host, for example after a new DHCP lease, is accepted once the old
+one has been silent for 3 heartbeats, about 81 s). More
 than 10 frames in 10 s per zone are dropped. Rejected frames never change
 state; they are counted per reason in the diagnostics.
 

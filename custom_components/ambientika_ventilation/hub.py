@@ -254,6 +254,27 @@ class AmbientikaHub:
         self._refresh_all(now)
         self._refresh_hub(now)
 
+    def update_cloud_status(
+        self, serial: str, status: AmbientikaStatus | None, at: float | None = None
+    ) -> None:
+        """Store a single device status read from the cloud outside a poll.
+
+        Used for the read-back after a command or filter reset, so the hub sees
+        the confirmed state without waiting for the next poll. Unknown devices
+        and missing statuses are ignored.
+        """
+        record = self._records.get(serial)
+        if record is None or status is None:
+            return
+        now = self._now(at)
+        record.status = status
+        record.failed = False
+        record.cloud_at = now
+        record.cloud_wall = self._wall_clock()
+        record.cycles += 1
+        self._confirm_expected(serial, record, now)
+        self._refresh_device(serial, now)
+
     def update_local(
         self, state: LocalZoneState | None, at: float | None = None
     ) -> tuple[str, ...]:

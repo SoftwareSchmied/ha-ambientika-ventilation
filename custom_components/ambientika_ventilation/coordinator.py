@@ -1189,7 +1189,7 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             )
             refreshed = _with_expected(latest or plan.status, plan.expected)
         self._remember_writable(serial, refreshed)
-        self._apply_status(serial, refreshed)
+        self._apply_status(serial, refreshed, confirmed=matched and latest is not None)
 
     def _clear_expected(self, serial: str, expected: dict[str, str]) -> None:
         """Forget the pending values of a command that was not accepted."""
@@ -1219,10 +1219,19 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
                 return latest, True
         return latest, False
 
-    def _apply_status(self, serial: str, status: AmbientikaStatus) -> None:
-        """Publish a status read back or written by an action."""
+    def _apply_status(
+        self, serial: str, status: AmbientikaStatus, *, confirmed: bool = False
+    ) -> None:
+        """Publish a status read back or written by an action.
+
+        ``confirmed`` marks a status actually read from the cloud; only those
+        are passed to the hub as cloud data. Optimistic values stay with the
+        hub's expected source.
+        """
         if self.data is None or serial not in self.data.devices:
             return
+        if confirmed and self.hub is not None:
+            self.hub.update_cloud_status(serial, status, at=time.monotonic())
         devices = dict(self.data.devices)
         devices[serial] = replace(devices[serial], status=status)
         self.async_set_updated_data(
@@ -1264,7 +1273,7 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             return
         base = latest or device_data.status
         if matched and latest is not None:
-            self._apply_status(serial, latest)
+            self._apply_status(serial, latest, confirmed=True)
         elif base is not None:
             # The official app also shows the filter as good right after a reset.
             self._apply_status(serial, replace(base, filter_status="Good"))

@@ -19,7 +19,8 @@ from types import MappingProxyType
 from typing import Any, Final
 
 from .local.models import (
-    UDP_HEARTBEAT_INTERVAL,
+    LOCAL_LOST_AFTER,
+    LOCAL_STALE_AFTER,
     Coupling,
     Direction,
     Freshness,
@@ -27,9 +28,9 @@ from .local.models import (
 )
 from .models import AmbientikaStatus
 
-LOCAL_FRESH_S: Final = 3 * UDP_HEARTBEAT_INTERVAL
+LOCAL_FRESH_S: Final = LOCAL_STALE_AFTER
 """A local frame younger than 3 heartbeats (~81 s) is fresh."""
-LOCAL_LOST_S: Final = 300.0
+LOCAL_LOST_S: Final = LOCAL_LOST_AFTER
 """No local frame for 5 minutes or more: the local link is lost."""
 CLOUD_FRESH_S: Final = 150.0
 """A cloud poll younger than this is fresh (2.5 x the default 60 s interval)."""
