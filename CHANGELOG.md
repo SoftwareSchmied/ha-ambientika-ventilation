@@ -21,6 +21,19 @@ All notable changes to this project are documented here. The format follows
   overlap rejection (HTTP 400) is reported clearly and the schedule is re-read
   after every change. The three write endpoints come from the official app and
   still need validation against hardware.
+- Add a derived-data engine (pure modules `analytics.py`, `psychrometrics.py`,
+  `weather_input.py`, `analytics_descriptions.py`; documented in
+  `docs/DERIVED_DATA.md`): runtimes per mode, stage and direction, reversal and
+  cycle counters, airflow and moved air volume, air change rate, estimated power
+  and energy, recovered heat and ventilation heat loss from an outdoor source,
+  dew point, absolute humidity and humidity distance to the setpoint, numeric air
+  quality, filter remaining hours and predicted alarm date, visible automatic
+  actions (humidity exhaust, night reduction, timed extraction, Smart behaviour,
+  free cooling, damper estimate), measurement validity with last valid room
+  values (the unit reads the wall duct while stopped), alarm durations, command
+  latency statistics and zone/house totals. Estimates are marked as such,
+  counters survive restarts and the recorder budget (rounding, thresholds,
+  minimum write intervals) is declared per value.
 - Merge commands for one unit that arrive together (for example mode and
   humidity target in a scene) into a single cloud request, based on the last
   known state plus commands not yet confirmed. Add the action
