@@ -118,6 +118,11 @@ async def async_get_config_entry_diagnostics(
             "next_discovery_attempt": _isoformat(
                 getattr(coordinator, "next_discovery_attempt", None)
             ),
+            "offline_devices": sorted(
+                _redact_identifier(serial)
+                for serial in getattr(coordinator, "offline_devices", ())
+            ),
+            "offline_transitions": getattr(coordinator, "offline_transitions", 0),
         },
         "request_metrics": runtime.api.metrics.as_dict(),
         "devices": devices,

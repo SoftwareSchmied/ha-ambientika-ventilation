@@ -113,6 +113,15 @@ class AmbientikaDeviceOfflineError(AmbientikaResponseError):
     default_kind = "device_offline"
 
 
+class AmbientikaStatusUnavailableError(AmbientikaDeviceOfflineError):
+    """The cloud holds no current status packet, so the device is offline.
+
+    The cloud answers HTTP 404 "Status packet not found!" a few minutes after a
+    unit lost power and returns to normal as soon as it reconnects. This is not
+    an unsupported endpoint and the device must keep being polled.
+    """
+
+
 class AmbientikaHouseNotConfiguredError(AmbientikaResponseError):
     """The house has no configured master device (HTTP 406)."""
 
@@ -571,6 +580,14 @@ def _http_error(
             trace_id=trace_id,
         )
     if status == 404:
+        if context == CONTEXT_DEVICE_STATUS and (
+            text.rstrip("!. ") == "status packet not found"
+        ):
+            return AmbientikaStatusUnavailableError(
+                "Ambientika device has no current status packet",
+                status=status,
+                trace_id=trace_id,
+            )
         if text == "house not found":
             return AmbientikaHouseNotFoundError(
                 "Ambientika house was not found", status=status, trace_id=trace_id

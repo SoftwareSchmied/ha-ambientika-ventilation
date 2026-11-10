@@ -64,6 +64,15 @@ async def test_diagnostics_redact_credentials_and_identifiers(hass) -> None:
     assert result["coordinator"]["last_failure_causes"] == []
     assert result["coordinator"]["discovery_failures"] == 0
     assert result["coordinator"]["next_discovery_attempt"] is None
+    assert result["coordinator"]["offline_devices"] == []
+    assert result["coordinator"]["offline_transitions"] == 0
+
+    coordinator.offline_devices = {serial}
+    coordinator.offline_transitions = 2
+    result = await async_get_config_entry_diagnostics(hass, entry)
+    assert result["coordinator"]["offline_devices"] == ["***EEFF"]
+    assert result["coordinator"]["offline_transitions"] == 2
+    assert serial not in repr(result)
     assert result["request_metrics"]["error_kinds"] == {}
     assert result["request_metrics"]["last_error"] is None
     assert serial not in output
