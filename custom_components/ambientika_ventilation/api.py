@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import random
 import time
 from collections import Counter
@@ -23,33 +24,123 @@ from .const import (
     WRITABLE_FAN_SPEEDS,
 )
 
+LOGGER = logging.getLogger(__name__)
+
 
 class AmbientikaApiError(Exception):
-    """Base class for Ambientika API errors."""
+    """Base class for Ambientika API errors.
+
+    ``kind`` classifies the failure for logging and diagnostics (for example
+    ``timeout``, ``connection``, ``http_5xx``, ``http_429``, ``http_4xx``,
+    ``auth`` or ``parse``). ``status`` and ``trace_id`` are only set when the
+    cloud returned an HTTP response.
+    """
+
+    default_kind = "api_error"
+
+    def __init__(
+        self,
+        message: str = "",
+        *,
+        kind: str | None = None,
+        status: int | None = None,
+        trace_id: str | None = None,
+    ) -> None:
+        """Store the message and non-sensitive failure details."""
+        super().__init__(message)
+        self.kind = kind or self.default_kind
+        self.status = status
+        self.trace_id = trace_id
+
+
+class AmbientikaConnectionError(AmbientikaApiError):
+    """The cloud could not be reached (timeout or transport error)."""
+
+    default_kind = "connection"
 
 
 class AmbientikaAuthError(AmbientikaApiError):
     """Authentication is missing or no longer valid."""
 
+    default_kind = "auth"
+
 
 class AmbientikaForbiddenError(AmbientikaApiError):
     """The account may not access a resource."""
+
+    default_kind = "http_4xx"
 
 
 class AmbientikaNotFoundError(AmbientikaApiError):
     """An optional resource is not supported."""
 
+    default_kind = "http_4xx"
+
+
+class AmbientikaHouseNotFoundError(AmbientikaNotFoundError):
+    """The house no longer exists or belongs to another account."""
+
+
+class AmbientikaDeviceNotFoundError(AmbientikaNotFoundError):
+    """The cloud no longer knows the device serial number."""
+
+
+class AmbientikaNoScheduleError(AmbientikaNotFoundError):
+    """The device has no weekly schedule configured."""
+
 
 class AmbientikaRateLimitError(AmbientikaApiError):
     """The cloud API rate limit was exceeded."""
+
+    default_kind = "http_429"
 
 
 class AmbientikaServerError(AmbientikaApiError):
     """The cloud API failed temporarily."""
 
+    default_kind = "http_5xx"
+
 
 class AmbientikaResponseError(AmbientikaApiError):
     """The cloud API returned an invalid response."""
+
+    default_kind = "parse"
+
+
+class AmbientikaDeviceOfflineError(AmbientikaResponseError):
+    """The device did not acknowledge a command (HTTP 406)."""
+
+    default_kind = "device_offline"
+
+
+class AmbientikaHouseNotConfiguredError(AmbientikaResponseError):
+    """The house has no configured master device (HTTP 406)."""
+
+    default_kind = "http_4xx"
+
+
+CONTEXT_COMMAND = "command"
+CONTEXT_DEVICE_STATUS = "device_status"
+CONTEXT_HOUSE_STATUS = "house_status"
+CONTEXT_SCHEDULE = "schedule"
+
+TRANSIENT_ERRORS = (
+    AmbientikaConnectionError,
+    AmbientikaServerError,
+    AmbientikaRateLimitError,
+)
+
+
+def describe_error(err: BaseException) -> str:
+    """Return a short, non-sensitive description of an API failure."""
+    if not isinstance(err, AmbientikaApiError):
+        return type(err).__name__
+    parts = [err.kind]
+    if err.status is not None:
+        parts.append(f"HTTP {err.status}")
+    if err.trace_id:
+        parts.append(f"traceId {err.trace_id}")
+    return ", ".join(parts)
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,15 +159,36 @@ class RequestMetrics:
     successful_requests: int = 0
     failed_requests: int = 0
     status_groups: Counter[str] = field(default_factory=Counter)
+    error_kinds: Counter[str] = field(default_factory=Counter)
     parser_errors: int = 0
     rate_limit_events: int = 0
     token_refreshes: int = 0
     last_request_duration_ms: int | None = None
+    last_error: dict[str, Any] | None = None
+
+    def record_error(
+        self,
+        kind: str,
+        *,
+        endpoint: str,
+        status: int | None = None,
+        trace_id: str | None = None,
+    ) -> None:
+        """Count one failed attempt and remember its non-sensitive details."""
+        self.error_kinds[kind] += 1
+        self.last_error = {
+            "kind": kind,
+            "endpoint": endpoint,
+            "status": status,
+            "trace_id": trace_id,
+            "at": datetime.now(UTC).isoformat(),
+        }
 
     def as_dict(self) -> dict[str, Any]:
         """Return JSON-serializable metrics."""
         data = asdict(self)
         data["status_groups"] = dict(self.status_groups)
+        data["error_kinds"] = dict(self.error_kinds)
         return data
 
 
@@ -179,6 +291,7 @@ class AmbientikaApiClient:
             "GET",
             "/Device/device-status",
             params={"deviceSerialNumber": serial_number},
+            context=CONTEXT_DEVICE_STATUS,
         )
         if not isinstance(payload, dict):
             self.metrics.parser_errors += 1
@@ -191,6 +304,7 @@ class AmbientikaApiClient:
             "GET",
             "/Device/house-devices-status",
             params={"houseId": str(house_id)},
+            context=CONTEXT_HOUSE_STATUS,
         )
         if not isinstance(payload, dict):
             self.metrics.parser_errors += 1
@@ -199,7 +313,9 @@ class AmbientikaApiClient:
 
     async def async_schedule(self, device_id: int) -> dict[str, Any]:
         """Return the weekly schedule configured for one device."""
-        payload = await self._request("GET", f"/Schedule/{device_id}")
+        payload = await self._request(
+            "GET", f"/Schedule/{device_id}", context=CONTEXT_SCHEDULE
+        )
         if not isinstance(payload, dict):
             self.metrics.parser_errors += 1
             raise AmbientikaResponseError("Schedule response is not an object")
@@ -239,6 +355,7 @@ class AmbientikaApiClient:
                 "lightSensorLevel": light_sensor_level,
                 "isScheduleMode": schedule_mode,
             },
+            context=CONTEXT_COMMAND,
         )
 
     async def async_reset_filter(self, serial_number: str) -> None:
@@ -247,6 +364,7 @@ class AmbientikaApiClient:
             "GET",
             "/Device/reset-filter",
             params={"deviceSerialNumber": serial_number},
+            context=CONTEXT_COMMAND,
         )
 
     async def _ensure_token(self) -> None:
@@ -274,11 +392,13 @@ class AmbientikaApiClient:
         authenticated: bool = True,
         ensure_token: bool = True,
         recover_auth: bool = True,
+        context: str | None = None,
     ) -> Any:
         """Perform one logical request with bounded transient retries."""
         if authenticated and ensure_token:
             await self._ensure_token()
 
+        endpoint = _endpoint_label(path)
         auth_recovered = False
         for attempt in range(3):
             headers = {}
@@ -296,11 +416,26 @@ class AmbientikaApiClient:
                     )
                     payload = await _response_payload(response)
             except (TimeoutError, ClientError) as err:
+                kind = "timeout" if isinstance(err, TimeoutError) else "connection"
                 self.metrics.failed_requests += 1
+                self.metrics.record_error(kind, endpoint=endpoint)
+                LOGGER.debug(
+                    "Ambientika %s %s attempt %d failed: %s",
+                    method,
+                    endpoint,
+                    attempt + 1,
+                    kind,
+                )
                 if attempt < 2:
                     await asyncio.sleep(_backoff(attempt))
                     continue
-                raise AmbientikaApiError("Ambientika cloud is unreachable") from err
+                raise AmbientikaConnectionError(
+                    "Ambientika cloud is unreachable", kind=kind
+                ) from err
+            except AmbientikaResponseError as err:
+                self.metrics.failed_requests += 1
+                self.metrics.record_error(err.kind, endpoint=endpoint)
+                raise
             finally:
                 self.metrics.last_request_duration_ms = round(
                     (time.monotonic() - started) * 1000
@@ -313,35 +448,40 @@ class AmbientikaApiClient:
                 return payload
 
             self.metrics.failed_requests += 1
-            if status == 401:
-                if authenticated and recover_auth and not auth_recovered:
-                    auth_recovered = True
-                    self._token = None
-                    await self._ensure_token()
-                    continue
-                raise AmbientikaAuthError("Ambientika rejected the credentials")
-            if status == 403:
-                raise AmbientikaForbiddenError(
-                    "Ambientika denied access to this resource"
-                )
-            if status == 404:
-                raise AmbientikaNotFoundError("Ambientika resource is not supported")
+            error = _http_error(
+                status,
+                payload,
+                _content_type(response),
+                authenticated=authenticated,
+                context=context,
+            )
+            self.metrics.record_error(
+                error.kind,
+                endpoint=endpoint,
+                status=status,
+                trace_id=error.trace_id,
+            )
+            LOGGER.debug(
+                "Ambientika %s %s attempt %d failed: %s",
+                method,
+                endpoint,
+                attempt + 1,
+                describe_error(error),
+            )
+            if status == 401 and authenticated and recover_auth and not auth_recovered:
+                auth_recovered = True
+                self._token = None
+                await self._ensure_token()
+                continue
             if status == 429:
                 self.metrics.rate_limit_events += 1
                 if attempt < 2:
                     await asyncio.sleep(_retry_after(response, attempt))
                     continue
-                raise AmbientikaRateLimitError("Ambientika rate limit exceeded")
-            if status >= 500:
-                if attempt < 2:
-                    await asyncio.sleep(_backoff(attempt))
-                    continue
-                raise AmbientikaServerError("Ambientika cloud returned a server error")
-            if status == 400 and not authenticated:
-                raise AmbientikaAuthError("Ambientika rejected the credentials")
-            raise AmbientikaResponseError(
-                f"Ambientika request failed with HTTP {status}"
-            )
+            elif status >= 500 and attempt < 2:
+                await asyncio.sleep(_backoff(attempt))
+                continue
+            raise error
 
         raise AmbientikaApiError("Ambientika request failed")
 
@@ -371,6 +511,114 @@ async def _response_payload(response: ClientResponse) -> Any:
         if 200 <= response.status < 300:
             raise AmbientikaResponseError("Ambientika returned invalid JSON") from None
         return None
+
+
+def _endpoint_label(path: str) -> str:
+    """Return a path label without identifiers for logs and diagnostics."""
+    return "/".join("{id}" if part.isdigit() else part for part in path.split("/"))
+
+
+def _content_type(response: ClientResponse) -> str:
+    """Return the lower-case response content type, if any."""
+    headers = getattr(response, "headers", None) or {}
+    return str(headers.get("Content-Type", "")).lower()
+
+
+def _error_text(payload: object) -> str | None:
+    """Return the message of a JSON string or object error body."""
+    if isinstance(payload, str):
+        return payload.strip() or None
+    if isinstance(payload, dict):
+        for key in ("message", "title", "detail"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return None
+
+
+def _trace_id(payload: object) -> str | None:
+    """Return the RFC 9110 problem trace identifier, if present."""
+    if isinstance(payload, dict):
+        value = payload.get("traceId")
+        if isinstance(value, str) and value:
+            return value[:80]
+    return None
+
+
+def _http_error(
+    status: int,
+    payload: object,
+    content_type: str,
+    *,
+    authenticated: bool,
+    context: str | None,
+) -> AmbientikaApiError:
+    """Classify an unsuccessful HTTP response into a typed API error."""
+    text = (_error_text(payload) or "").casefold()
+    trace_id = _trace_id(payload)
+    is_problem = "problem+json" in content_type or (
+        isinstance(payload, dict) and ("traceId" in payload or "title" in payload)
+    )
+
+    if status == 401:
+        return AmbientikaAuthError(
+            "Ambientika rejected the credentials", status=status, trace_id=trace_id
+        )
+    if status == 403:
+        return AmbientikaForbiddenError(
+            "Ambientika denied access to this resource",
+            status=status,
+            trace_id=trace_id,
+        )
+    if status == 404:
+        if text == "house not found":
+            return AmbientikaHouseNotFoundError(
+                "Ambientika house was not found", status=status, trace_id=trace_id
+            )
+        if context == CONTEXT_SCHEDULE and is_problem:
+            return AmbientikaNoScheduleError(
+                "No Ambientika schedule is configured",
+                status=status,
+                trace_id=trace_id,
+            )
+        return AmbientikaNotFoundError(
+            "Ambientika resource is not supported", status=status, trace_id=trace_id
+        )
+    if status == 406 and context == CONTEXT_COMMAND:
+        return AmbientikaDeviceOfflineError(
+            "Ambientika device did not respond", status=status, trace_id=trace_id
+        )
+    if status == 406 and context == CONTEXT_HOUSE_STATUS:
+        return AmbientikaHouseNotConfiguredError(
+            "Ambientika house has no configured master",
+            status=status,
+            trace_id=trace_id,
+        )
+    if status == 429:
+        return AmbientikaRateLimitError(
+            "Ambientika rate limit exceeded", status=status, trace_id=trace_id
+        )
+    if status >= 500:
+        return AmbientikaServerError(
+            "Ambientika cloud returned a server error",
+            status=status,
+            trace_id=trace_id,
+        )
+    if (
+        status == 400
+        and authenticated
+        and context == CONTEXT_DEVICE_STATUS
+        and text == "device not found"
+    ):
+        return AmbientikaDeviceNotFoundError(
+            "Ambientika device was not found", status=status, trace_id=trace_id
+        )
+    return AmbientikaResponseError(
+        f"Ambientika request failed with HTTP {status}",
+        kind="http_4xx",
+        status=status,
+        trace_id=trace_id,
+    )
 
 
 def _date_text(value: object) -> str:
