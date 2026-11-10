@@ -8,7 +8,7 @@ import logging
 import random
 import time
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -25,6 +25,8 @@ from .const import (
     REQUEST_TIMEOUT,
     WRITABLE_FAN_SPEEDS,
 )
+from .models import AmbientikaTimeSlot
+from .schedule import ScheduleValidationError, SlotSpec, find_overlap, validate_slot
 
 LOGGER = logging.getLogger(__name__)
 
@@ -97,6 +99,10 @@ class AmbientikaNoScheduleError(AmbientikaNotFoundError):
     """The device has no weekly schedule configured."""
 
 
+class AmbientikaTimeSlotNotFoundError(AmbientikaNotFoundError):
+    """The cloud does not know the time slot (or its schedule) of a write."""
+
+
 class AmbientikaRateLimitError(AmbientikaApiError):
     """The cloud API rate limit was exceeded."""
 
@@ -113,6 +119,12 @@ class AmbientikaResponseError(AmbientikaApiError):
     """The cloud API returned an invalid response."""
 
     default_kind = "parse"
+
+
+class AmbientikaScheduleOverlapError(AmbientikaResponseError):
+    """A time slot overlaps another one (HTTP 400, ``Schedule.OverlapError``)."""
+
+    default_kind = "schedule_overlap"
 
 
 class AmbientikaDeviceOfflineError(AmbientikaResponseError):
@@ -140,6 +152,7 @@ CONTEXT_COMMAND = "command"
 CONTEXT_DEVICE_STATUS = "device_status"
 CONTEXT_HOUSE_STATUS = "house_status"
 CONTEXT_SCHEDULE = "schedule"
+CONTEXT_SCHEDULE_WRITE = "schedule_write"
 
 TRANSIENT_ERRORS = (
     AmbientikaConnectionError,
@@ -379,6 +392,94 @@ class AmbientikaApiClient:
             raise AmbientikaResponseError("Schedule response is not an object")
         return payload
 
+    async def async_create_time_slot(
+        self,
+        device_id: int,
+        *,
+        schedule_id: int | None,
+        day_of_week: object,
+        start_time: object,
+        end_time: object,
+        operating_mode: object,
+        fan_speed: object,
+        humidity_level: object,
+        light_sensor_level: object,
+        existing_slots: Iterable[AmbientikaTimeSlot] = (),
+        allowed_modes: tuple[str, ...] = OPERATING_MODES,
+        allow_turbo: bool = False,
+    ) -> None:
+        """Validate and add one weekly time slot.
+
+        Raises ``ScheduleValidationError`` for unusable values and for a slot
+        that overlaps one of ``existing_slots``; the cloud's own overlap
+        answer (HTTP 400) raises ``AmbientikaScheduleOverlapError``.
+        """
+        spec = _checked_slot(
+            None,
+            existing_slots,
+            allowed_modes=allowed_modes,
+            allow_turbo=allow_turbo,
+            day_of_week=day_of_week,
+            start_time=start_time,
+            end_time=end_time,
+            operating_mode=operating_mode,
+            fan_speed=fan_speed,
+            humidity_level=humidity_level,
+            light_sensor_level=light_sensor_level,
+        )
+        await self._request(
+            "POST",
+            f"/Schedule/{_positive_id(device_id)}/timeslots",
+            json_body=spec.to_payload(0, schedule_id),
+            context=CONTEXT_SCHEDULE_WRITE,
+        )
+
+    async def async_update_time_slot(
+        self,
+        device_id: int,
+        slot_id: int,
+        *,
+        schedule_id: int | None,
+        day_of_week: object,
+        start_time: object,
+        end_time: object,
+        operating_mode: object,
+        fan_speed: object,
+        humidity_level: object,
+        light_sensor_level: object,
+        existing_slots: Iterable[AmbientikaTimeSlot] = (),
+        allowed_modes: tuple[str, ...] = OPERATING_MODES,
+        allow_turbo: bool = False,
+    ) -> None:
+        """Validate and replace one weekly time slot (all fields are sent)."""
+        spec = _checked_slot(
+            _positive_id(slot_id),
+            existing_slots,
+            allowed_modes=allowed_modes,
+            allow_turbo=allow_turbo,
+            day_of_week=day_of_week,
+            start_time=start_time,
+            end_time=end_time,
+            operating_mode=operating_mode,
+            fan_speed=fan_speed,
+            humidity_level=humidity_level,
+            light_sensor_level=light_sensor_level,
+        )
+        await self._request(
+            "PUT",
+            f"/Schedule/{_positive_id(device_id)}/timeslots/{slot_id}",
+            json_body=spec.to_payload(slot_id, schedule_id),
+            context=CONTEXT_SCHEDULE_WRITE,
+        )
+
+    async def async_delete_time_slot(self, device_id: int, slot_id: int) -> None:
+        """Delete one weekly time slot."""
+        await self._request(
+            "DELETE",
+            f"/Schedule/{_positive_id(device_id)}/timeslots/{_positive_id(slot_id)}",
+            context=CONTEXT_SCHEDULE_WRITE,
+        )
+
     async def async_feature_flags(self) -> dict[str, bool]:
         """Return account-independent server feature flags."""
         payload = await self._request("GET", "/Users/feature-flags")
@@ -459,7 +560,9 @@ class AmbientikaApiClient:
 
         endpoint = _endpoint_label(path)
         pool = (
-            self._command_semaphore if context == CONTEXT_COMMAND else self._semaphore
+            self._command_semaphore
+            if context in (CONTEXT_COMMAND, CONTEXT_SCHEDULE_WRITE)
+            else self._semaphore
         )
         attempt = 0
         auth_recovered = False
@@ -631,6 +734,13 @@ def _error_text(payload: object) -> str | None:
     return None
 
 
+def _payload_text(payload: object) -> str:
+    """Return all text of an error body in lower case, for keyword checks."""
+    if payload is None:
+        return ""
+    return json.dumps(payload, ensure_ascii=False).casefold()
+
+
 def _trace_id(payload: object) -> str | None:
     """Return the RFC 9110 problem trace identifier, if present."""
     if isinstance(payload, dict):
@@ -678,6 +788,12 @@ def _http_error(
             return AmbientikaHouseNotFoundError(
                 "Ambientika house was not found", status=status, trace_id=trace_id
             )
+        if context == CONTEXT_SCHEDULE_WRITE:
+            return AmbientikaTimeSlotNotFoundError(
+                "Ambientika does not know this time slot",
+                status=status,
+                trace_id=trace_id,
+            )
         if context == CONTEXT_SCHEDULE and is_problem:
             return AmbientikaNoScheduleError(
                 "No Ambientika schedule is configured",
@@ -687,7 +803,19 @@ def _http_error(
         return AmbientikaNotFoundError(
             "Ambientika resource is not supported", status=status, trace_id=trace_id
         )
-    if status == 406 and context == CONTEXT_COMMAND:
+    # The official app reads every HTTP 400 on time slots as an overlap; an
+    # answer that names a different problem stays a plain rejection.
+    if (
+        status == 400
+        and context == CONTEXT_SCHEDULE_WRITE
+        and ("overlap" in (body := _payload_text(payload)) or not body)
+    ):
+        return AmbientikaScheduleOverlapError(
+            "Ambientika rejected the time slot because it overlaps another",
+            status=status,
+            trace_id=trace_id,
+        )
+    if status == 406 and context in (CONTEXT_COMMAND, CONTEXT_SCHEDULE_WRITE):
         return AmbientikaDeviceOfflineError(
             "Ambientika device did not respond", status=status, trace_id=trace_id
         )
@@ -762,6 +890,25 @@ def _shape(value: object, depth: int = 0) -> Any:
             return f"list[{len(value)}]"
         return [_shape(value[0], depth + 1), f"{len(value)} item(s)"]
     return type(value).__name__
+
+
+def _positive_id(value: object) -> int:
+    """Return a cloud identifier, rejecting anything that is not a positive int."""
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ScheduleValidationError("schedule_invalid_id", value=str(value))
+    return value
+
+
+def _checked_slot(
+    ignore_id: int | None,
+    existing_slots: Iterable[AmbientikaTimeSlot],
+    **fields: Any,
+) -> SlotSpec:
+    """Validate slot values and reject an overlap with the existing slots."""
+    spec = validate_slot(**fields)
+    if find_overlap(spec, existing_slots, ignore_id=ignore_id) is not None:
+        raise ScheduleValidationError("time_slot_overlap")
+    return spec
 
 
 def _validate_choice(name: str, value: str, choices: tuple[str, ...]) -> None:

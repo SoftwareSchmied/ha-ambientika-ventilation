@@ -13,10 +13,25 @@ Renaming a room or device therefore does not create duplicate entities.
 | Select | `light_sensor_level` | Off/Low/Medium light sensitivity | When reported and permitted |
 | Switch | `schedule_control` | Enable or disable an existing weekly schedule | Devices with schedule support |
 | Button | `reset_filter` | Reset filter status after replacement | Only while filter status is Bad |
+| Calendar | `schedule_calendar` | Weekly schedule as recurring events; editable when the account and unit allow it | Units with a loaded schedule |
 
 Manual controls are intentionally rejected while a schedule is active or the
 filter state is `Bad`. The schedule can still be disabled and the filter can
 still be reset.
+
+## Schedule calendar
+
+One calendar per controllable unit that has a weekly schedule (the unit reports
+a schedule state other than `NotAvailable` and the account has the
+`weeklyScheduler` feature). Each time slot is a weekly recurring event in the
+house time zone (`ianaTimezone`, else the Home Assistant time zone). The event
+title shows mode, fan speed and humidity target; the description lists every
+field as `field: option` lines. The calendar is read-only when the account
+lacks the feature or the unit reports `NotAvailable`.
+
+Actions on the calendar: `set_time_slot`, `delete_time_slot`, `clear_schedule`
+(needs `confirm: true`) and `get_schedule` (returns the slots). See the README
+section "Schedules".
 
 ## Primary sensors
 

@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+- Weekly schedules as a Home Assistant calendar. Each controllable unit with a
+  schedule gets a calendar entity that shows its time slots as weekly recurring
+  events in the house time zone (daylight saving time safe), with mode, fan
+  speed and humidity target in the title. The calendar is read-only when the
+  account lacks the `weeklyScheduler` feature or the unit reports
+  `NotAvailable`.
+- Edit schedules: create, change and delete events in the calendar (only events
+  that repeat weekly on their own weekday map to a time slot) or use the new
+  actions `set_time_slot`, `delete_time_slot`, `clear_schedule` (needs an
+  explicit confirmation) and `get_schedule` (response only). Values are checked
+  before anything is sent: weekday, start before end, whole minutes, no
+  overlapping slots, no fan speed `Night`, Turbo only when allowed. The cloud's
+  overlap rejection (HTTP 400) is reported clearly and the schedule is re-read
+  after every change. The three write endpoints come from the official app and
+  still need validation against hardware.
 - Merge commands for one unit that arrive together (for example mode and
   humidity target in a scene) into a single cloud request, based on the last
   known state plus commands not yet confirmed. Add the action

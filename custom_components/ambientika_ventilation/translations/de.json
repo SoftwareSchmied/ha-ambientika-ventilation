@@ -60,66 +60,386 @@
     }
   },
   "exceptions": {
-    "device_unavailable": { "message": "Für das Lüftungsgerät ist kein lesbarer Zustand verfügbar." },
-    "device_not_controllable": { "message": "Nur Zonen-Mastergeräte können gesteuert werden." },
-    "controls_locked_filter": { "message": "Die Gerätesteuerung ist gesperrt, bis der Filterstatus zurückgesetzt wurde." },
-    "controls_locked_schedule": { "message": "Deaktiviere den Wochenzeitplan, bevor du manuelle Einstellungen änderst." },
-    "unsupported_operating_mode": { "message": "Die Betriebsart {mode} wird von diesem Gerätetyp nicht unterstützt." },
-    "setting_unavailable": { "message": "{setting} kann in der Betriebsart {mode} nicht geändert werden." },
-    "schedule_unsupported": { "message": "Dieses Gerät unterstützt keine Wochenzeitplanung." },
-    "incomplete_writable_state": { "message": "Das Gerät hat keinen vollständigen schreibbaren Zustand gemeldet." },
-    "cloud_command_failed": { "message": "Die Ambientika-Cloud hat den Befehl nicht angenommen." },
-    "filter_reset_failed": { "message": "Der Filterstatus konnte über die Ambientika-Cloud nicht zurückgesetzt werden." },
-    "unsupported_preset_mode": { "message": "Die Lüfter-Voreinstellung {preset} wird nicht unterstützt." },
-    "invalid_fan_percentage": { "message": "Der Lüfterwert muss zwischen 1 und 100 Prozent liegen." },
-    "unsupported_select_option": { "message": "Die Option {option} wird nicht unterstützt." },
-    "device_offline": { "message": "Das Lüftungsgerät hat nicht auf den Befehl reagiert. Prüfe in der Ambientika-App, ob es online ist." },
-    "auth_failed": { "message": "Die Ambientika-Cloud hat die gespeicherten Zugangsdaten abgelehnt. Melde die Integration erneut an." },
-    "set_state_empty": { "message": "Gib mindestens einen Wert an." },
-    "update_failed": { "message": "Aktualisierung aus der Ambientika-Cloud nicht möglich: {details}" }
+    "device_unavailable": {
+      "message": "Für das Lüftungsgerät ist kein lesbarer Zustand verfügbar."
+    },
+    "device_not_controllable": {
+      "message": "Nur Zonen-Mastergeräte können gesteuert werden."
+    },
+    "controls_locked_filter": {
+      "message": "Die Gerätesteuerung ist gesperrt, bis der Filterstatus zurückgesetzt wurde."
+    },
+    "controls_locked_schedule": {
+      "message": "Deaktiviere den Wochenzeitplan, bevor du manuelle Einstellungen änderst."
+    },
+    "unsupported_operating_mode": {
+      "message": "Die Betriebsart {mode} wird von diesem Gerätetyp nicht unterstützt."
+    },
+    "setting_unavailable": {
+      "message": "{setting} kann in der Betriebsart {mode} nicht geändert werden."
+    },
+    "schedule_unsupported": {
+      "message": "Dieses Gerät unterstützt keine Wochenzeitplanung."
+    },
+    "incomplete_writable_state": {
+      "message": "Das Gerät hat keinen vollständigen schreibbaren Zustand gemeldet."
+    },
+    "cloud_command_failed": {
+      "message": "Die Ambientika-Cloud hat den Befehl nicht angenommen."
+    },
+    "filter_reset_failed": {
+      "message": "Der Filterstatus konnte über die Ambientika-Cloud nicht zurückgesetzt werden."
+    },
+    "unsupported_preset_mode": {
+      "message": "Die Lüfter-Voreinstellung {preset} wird nicht unterstützt."
+    },
+    "invalid_fan_percentage": {
+      "message": "Der Lüfterwert muss zwischen 1 und 100 Prozent liegen."
+    },
+    "unsupported_select_option": {
+      "message": "Die Option {option} wird nicht unterstützt."
+    },
+    "device_offline": {
+      "message": "Das Lüftungsgerät hat nicht auf den Befehl reagiert. Prüfe in der Ambientika-App, ob es online ist."
+    },
+    "auth_failed": {
+      "message": "Die Ambientika-Cloud hat die gespeicherten Zugangsdaten abgelehnt. Melde die Integration erneut an."
+    },
+    "set_state_empty": {
+      "message": "Gib mindestens einen Wert an."
+    },
+    "update_failed": {
+      "message": "Aktualisierung aus der Ambientika-Cloud nicht möglich: {details}"
+    },
+    "schedule_read_only": {
+      "message": "Der Wochenzeitplan dieses Geräts ist schreibgeschützt. Das Konto braucht die Wochenzeitplan-Funktion und das Gerät muss einen Zeitplan melden."
+    },
+    "schedule_write_failed": {
+      "message": "Die Ambientika-Cloud hat die Zeitplanänderung nicht angenommen."
+    },
+    "schedule_invalid_id": {
+      "message": "{value} ist keine gültige Kennung."
+    },
+    "schedule_invalid_day": {
+      "message": "{value} ist kein gültiger Wochentag."
+    },
+    "schedule_invalid_time": {
+      "message": "Die {field}-Zeit muss eine Uhrzeit ohne Sekunden sein, zum Beispiel 07:30."
+    },
+    "schedule_time_order": {
+      "message": "Die Startzeit muss am selben Tag vor der Endzeit liegen. Zeitfenster können nicht über Mitternacht gehen."
+    },
+    "schedule_invalid_value": {
+      "message": "{value} ist für {field} in einem Zeitfenster nicht erlaubt."
+    },
+    "time_slot_overlap": {
+      "message": "Das Zeitfenster überschneidet sich mit einem anderen Zeitfenster am selben Tag."
+    },
+    "time_slot_not_found": {
+      "message": "Dieses Zeitfenster existiert nicht."
+    },
+    "time_slot_incomplete": {
+      "message": "Ein neues Zeitfenster braucht Tag, Startzeit, Endzeit und Betriebsart."
+    },
+    "clear_schedule_not_confirmed": {
+      "message": "Schalte die Bestätigung ein, um alle Zeitfenster zu löschen."
+    },
+    "calendar_event_not_weekly": {
+      "message": "Nur Termine, die wöchentlich an ihrem eigenen Wochentag wiederkehren, lassen sich als Zeitfenster speichern, ohne Enddatum, Anzahl oder Intervall."
+    },
+    "calendar_event_not_representable": {
+      "message": "Ein Zeitfenster beginnt und endet am selben Tag zur vollen Minute. Ganztägige Termine lassen sich nicht speichern."
+    },
+    "calendar_event_mode_missing": {
+      "message": "Nenne die Betriebsart im Titel (zum Beispiel Nacht) oder schreibe mode: night in die Beschreibung."
+    },
+    "calendar_recurrence_unsupported": {
+      "message": "Ein einzelnes Vorkommen lässt sich nicht ändern. Bearbeite oder lösche den gesamten wöchentlichen Termin."
+    }
   },
   "entity": {
-    "fan": { "ventilation": { "name": "Lüftung", "state_attributes": { "preset_mode": { "state": { "night": "Nacht" } } } } },
+    "fan": {
+      "ventilation": {
+        "name": "Lüftung",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "night": "Nacht"
+            }
+          }
+        }
+      }
+    },
     "sensor": {
-      "temperature": { "name": "Temperatur" },
-      "humidity": { "name": "Luftfeuchtigkeit" },
-      "signal_strength": { "name": "Signalstärke" },
-      "air_quality": { "name": "Luftqualität", "state": { "very_good": "Sehr gut", "good": "Gut", "medium": "Mittel", "poor": "Schlecht", "bad": "Sehr schlecht" } },
-      "filter_status": { "name": "Filterstatus", "state": { "good": "Gut", "medium": "Bald wechseln", "bad": "Wechseln" } },
-      "packet_type": { "name": "Pakettyp" },
-      "last_operating_mode": { "name": "Letzte Betriebsart", "state": { "smart": "Smart", "auto": "Automatik", "heat_recovery": "Wärmerückgewinnung", "night": "Nacht", "away": "Abwesend", "surveillance": "Überwachung", "timed_extraction": "Zeitgesteuerte Abluft", "extraction": "Abluft", "intake": "Zuluft", "master_slave_flow": "Master-zu-Slave-Luftstrom", "slave_master_flow": "Slave-zu-Master-Luftstrom", "off": "Aus", "turbo": "Turbo (alt)" } },
-      "device_type": { "name": "Gerätetyp" },
-      "device_subtype": { "name": "Geräteuntertyp" },
-      "device_role": { "name": "Geräterolle", "state": { "master": "Master", "slave_equal_master": "Slave synchron", "slave_opposite_master": "Slave alternierend", "not_configured": "Nicht konfiguriert" } },
-      "installation": { "name": "Installation" },
-      "micro_firmware": { "name": "Controller-Firmware" },
-      "radio_firmware": { "name": "Funk-Firmware" },
-      "radio_at_firmware": { "name": "Funk-AT-Firmware" },
-      "house": { "name": "Haus" },
-      "zone": { "name": "Zone" },
-      "room": { "name": "Raum" },
-      "device_id": { "name": "Cloud-Geräte-ID" },
-      "house_id": { "name": "Cloud-Haus-ID" },
-      "room_id": { "name": "Cloud-Raum-ID" },
-      "zone_id": { "name": "Cloud-Zonen-ID" },
-      "zone_index": { "name": "Zonenindex" },
-      "schedule_entries": { "name": "Zeitplaneinträge" }
+      "temperature": {
+        "name": "Temperatur"
+      },
+      "humidity": {
+        "name": "Luftfeuchtigkeit"
+      },
+      "signal_strength": {
+        "name": "Signalstärke"
+      },
+      "air_quality": {
+        "name": "Luftqualität",
+        "state": {
+          "very_good": "Sehr gut",
+          "good": "Gut",
+          "medium": "Mittel",
+          "poor": "Schlecht",
+          "bad": "Sehr schlecht"
+        }
+      },
+      "filter_status": {
+        "name": "Filterstatus",
+        "state": {
+          "good": "Gut",
+          "medium": "Bald wechseln",
+          "bad": "Wechseln"
+        }
+      },
+      "packet_type": {
+        "name": "Pakettyp"
+      },
+      "last_operating_mode": {
+        "name": "Letzte Betriebsart",
+        "state": {
+          "smart": "Smart",
+          "auto": "Automatik",
+          "heat_recovery": "Wärmerückgewinnung",
+          "night": "Nacht",
+          "away": "Abwesend",
+          "surveillance": "Überwachung",
+          "timed_extraction": "Zeitgesteuerte Abluft",
+          "extraction": "Abluft",
+          "intake": "Zuluft",
+          "master_slave_flow": "Master-zu-Slave-Luftstrom",
+          "slave_master_flow": "Slave-zu-Master-Luftstrom",
+          "off": "Aus",
+          "turbo": "Turbo (alt)"
+        }
+      },
+      "device_type": {
+        "name": "Gerätetyp"
+      },
+      "device_subtype": {
+        "name": "Geräteuntertyp"
+      },
+      "device_role": {
+        "name": "Geräterolle",
+        "state": {
+          "master": "Master",
+          "slave_equal_master": "Slave synchron",
+          "slave_opposite_master": "Slave alternierend",
+          "not_configured": "Nicht konfiguriert"
+        }
+      },
+      "installation": {
+        "name": "Installation"
+      },
+      "micro_firmware": {
+        "name": "Controller-Firmware"
+      },
+      "radio_firmware": {
+        "name": "Funk-Firmware"
+      },
+      "radio_at_firmware": {
+        "name": "Funk-AT-Firmware"
+      },
+      "house": {
+        "name": "Haus"
+      },
+      "zone": {
+        "name": "Zone"
+      },
+      "room": {
+        "name": "Raum"
+      },
+      "device_id": {
+        "name": "Cloud-Geräte-ID"
+      },
+      "house_id": {
+        "name": "Cloud-Haus-ID"
+      },
+      "room_id": {
+        "name": "Cloud-Raum-ID"
+      },
+      "zone_id": {
+        "name": "Cloud-Zonen-ID"
+      },
+      "zone_index": {
+        "name": "Zonenindex"
+      },
+      "schedule_entries": {
+        "name": "Zeitplaneinträge"
+      }
     },
     "binary_sensor": {
-      "humidity_alarm": { "name": "Feuchtealarm" },
-      "filter_problem": { "name": "Filter prüfen" },
-      "night": { "name": "Nacht erkannt" },
-      "schedule": { "name": "Zeitplan" },
-      "cloud_connection": { "name": "Cloud-Verbindung" }
+      "humidity_alarm": {
+        "name": "Feuchtealarm"
+      },
+      "filter_problem": {
+        "name": "Filter prüfen"
+      },
+      "night": {
+        "name": "Nacht erkannt"
+      },
+      "schedule": {
+        "name": "Zeitplan"
+      },
+      "cloud_connection": {
+        "name": "Cloud-Verbindung"
+      }
     },
     "select": {
-      "operating_mode": { "name": "Betriebsart", "state": { "smart": "Smart", "auto": "Automatik", "heat_recovery": "Wärmerückgewinnung", "night": "Nacht", "away": "Abwesend", "surveillance": "Überwachung", "timed_extraction": "Zeitgesteuerte Abluft", "extraction": "Abluft", "intake": "Zuluft", "master_slave_flow": "Master-zu-Slave-Luftstrom", "slave_master_flow": "Slave-zu-Master-Luftstrom", "off": "Aus" } },
-      "humidity_level": { "name": "Feuchteziel", "state": { "dry": "Trocken", "normal": "Normal", "moist": "Feucht" } },
-      "light_sensor_level": { "name": "Lichtsensor-Empfindlichkeit", "state": { "off": "Aus", "low": "Niedrig", "medium": "Mittel" } }
+      "operating_mode": {
+        "name": "Betriebsart",
+        "state": {
+          "smart": "Smart",
+          "auto": "Automatik",
+          "heat_recovery": "Wärmerückgewinnung",
+          "night": "Nacht",
+          "away": "Abwesend",
+          "surveillance": "Überwachung",
+          "timed_extraction": "Zeitgesteuerte Abluft",
+          "extraction": "Abluft",
+          "intake": "Zuluft",
+          "master_slave_flow": "Master-zu-Slave-Luftstrom",
+          "slave_master_flow": "Slave-zu-Master-Luftstrom",
+          "off": "Aus"
+        }
+      },
+      "humidity_level": {
+        "name": "Feuchteziel",
+        "state": {
+          "dry": "Trocken",
+          "normal": "Normal",
+          "moist": "Feucht"
+        }
+      },
+      "light_sensor_level": {
+        "name": "Lichtsensor-Empfindlichkeit",
+        "state": {
+          "off": "Aus",
+          "low": "Niedrig",
+          "medium": "Mittel"
+        }
+      }
     },
-    "switch": { "schedule": { "name": "Zeitplansteuerung" } },
-    "button": { "reset_filter": { "name": "Filterstatus zurücksetzen" } }
+    "switch": {
+      "schedule": {
+        "name": "Zeitplansteuerung"
+      }
+    },
+    "button": {
+      "reset_filter": {
+        "name": "Filterstatus zurücksetzen"
+      }
+    },
+    "calendar": {
+      "schedule": {
+        "name": "Zeitplan"
+      }
+    }
   },
-  "options": {"step": {"init": {"title": "Ambientika-Optionen", "description": "Lege fest, wie oft die Ambientika-Cloud abgefragt wird. Das Gerät meldet etwa alle 30 Sekunden, kürzere Abstände bringen nichts. Nach einem Befehl fragt die Integration drei Minuten lang alle 30 Sekunden ab und wird bei einer nicht erreichbaren Cloud automatisch langsamer.", "data": {"scan_interval": "Abfrageintervall"}, "data_description": {"scan_interval": "Sekunden zwischen den Cloud-Abfragen (30 bis 600)."}}}},
-  "services": {"set_state": {"name": "Zustand setzen", "description": "Setzt Betriebsart, Lüfterstufe, Feuchteziel und Lichtsensor-Empfindlichkeit in einem Befehl. Nur die angegebenen Werte ändern sich.", "fields": {"operating_mode": {"name": "Betriebsart", "description": "Neue Betriebsart."}, "fan_speed": {"name": "Lüfterstufe", "description": "Neue Lüfterstufe; nur in Betriebsarten mit wählbarer Stufe."}, "humidity_level": {"name": "Feuchteziel", "description": "Neues Feuchteziel; nur in den Betriebsarten Automatik und Überwachung."}, "light_sensor_level": {"name": "Lichtsensor-Empfindlichkeit", "description": "Neue Lichtsensor-Empfindlichkeit; nur in den Betriebsarten Smart und Automatik."}}}}
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ambientika-Optionen",
+        "description": "Lege fest, wie oft die Ambientika-Cloud abgefragt wird. Das Gerät meldet etwa alle 30 Sekunden, kürzere Abstände bringen nichts. Nach einem Befehl fragt die Integration drei Minuten lang alle 30 Sekunden ab und wird bei einer nicht erreichbaren Cloud automatisch langsamer.",
+        "data": {
+          "scan_interval": "Abfrageintervall"
+        },
+        "data_description": {
+          "scan_interval": "Sekunden zwischen den Cloud-Abfragen (30 bis 600)."
+        }
+      }
+    }
+  },
+  "services": {
+    "set_state": {
+      "name": "Zustand setzen",
+      "description": "Setzt Betriebsart, Lüfterstufe, Feuchteziel und Lichtsensor-Empfindlichkeit in einem Befehl. Nur die angegebenen Werte ändern sich.",
+      "fields": {
+        "operating_mode": {
+          "name": "Betriebsart",
+          "description": "Neue Betriebsart."
+        },
+        "fan_speed": {
+          "name": "Lüfterstufe",
+          "description": "Neue Lüfterstufe; nur in Betriebsarten mit wählbarer Stufe."
+        },
+        "humidity_level": {
+          "name": "Feuchteziel",
+          "description": "Neues Feuchteziel; nur in den Betriebsarten Automatik und Überwachung."
+        },
+        "light_sensor_level": {
+          "name": "Lichtsensor-Empfindlichkeit",
+          "description": "Neue Lichtsensor-Empfindlichkeit; nur in den Betriebsarten Smart und Automatik."
+        }
+      }
+    },
+    "set_time_slot": {
+      "name": "Zeitfenster setzen",
+      "description": "Legt ein wöchentliches Zeitfenster an oder ändert ein vorhandenes, wenn eine Kennung angegeben ist. Nicht angegebene Werte bleiben unverändert. Das Zeitfenster darf sich nicht mit einem anderen am selben Tag überschneiden.",
+      "fields": {
+        "slot_id": {
+          "name": "Zeitfenster",
+          "description": "Kennung eines vorhandenen Zeitfensters, das geändert wird. Leer lassen, um ein neues anzulegen. Mit Zeitplan abrufen lassen sich die Kennungen auflisten."
+        },
+        "day": {
+          "name": "Day",
+          "description": "Wochentag des Zeitfensters."
+        },
+        "start": {
+          "name": "Start",
+          "description": "Startzeit. Sekunden müssen null sein."
+        },
+        "end": {
+          "name": "Ende",
+          "description": "Endzeit am selben Tag, nach dem Start. Sekunden müssen null sein."
+        },
+        "operating_mode": {
+          "name": "Betriebsart",
+          "description": "Betriebsart des Zeitfensters."
+        },
+        "fan_speed": {
+          "name": "Lüfterstufe",
+          "description": "Lüfterstufe. Für ein neues Zeitfenster ist niedrig voreingestellt. Turbo nur, wenn das Gerät es erlaubt."
+        },
+        "humidity_level": {
+          "name": "Feuchteziel",
+          "description": "Feuchteziel. Für ein neues Zeitfenster ist normal voreingestellt."
+        },
+        "light_sensor_level": {
+          "name": "Lichtsensor-Empfindlichkeit",
+          "description": "Lichtsensor-Empfindlichkeit. Für ein neues Zeitfenster ist aus voreingestellt."
+        }
+      }
+    },
+    "delete_time_slot": {
+      "name": "Zeitfenster löschen",
+      "description": "Löscht ein wöchentliches Zeitfenster.",
+      "fields": {
+        "slot_id": {
+          "name": "Zeitfenster",
+          "description": "Kennung des zu löschenden Zeitfensters."
+        }
+      }
+    },
+    "clear_schedule": {
+      "name": "Zeitplan leeren",
+      "description": "Löscht alle wöchentlichen Zeitfenster des Geräts. Das lässt sich nicht rückgängig machen.",
+      "fields": {
+        "confirm": {
+          "name": "Bestätigen",
+          "description": "Muss eingeschaltet sein, um alle Zeitfenster zu löschen."
+        }
+      }
+    },
+    "get_schedule": {
+      "name": "Zeitplan abrufen",
+      "description": "Gibt die wöchentlichen Zeitfenster des Geräts mit ihren Kennungen zurück."
+    }
+  }
 }

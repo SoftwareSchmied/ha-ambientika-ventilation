@@ -23,7 +23,10 @@ that every firmware or account supports every field.
 | `/Device/change-mode` humidity level | enum | Dry, Normal, Moist | Read/write | On demand + read-back | Select | Enabled |
 | `/Device/change-mode` light level | enum | Off, Low, Medium | Read/write when reported | On demand + read-back | Select | Enabled |
 | `/Device/reset-filter` | command | Reset | Write + read-back | On demand | Button | Enabled |
-| `/Schedule/{deviceId}` | object | Weekly time slots | Read | Start + 6 h | Diagnostic sensor | Disabled |
+| `/Schedule/{deviceId}` | object | Weekly time slots | Read | Start + 6 h | Diagnostic sensor, calendar | Disabled / enabled |
+| `POST /Schedule/{deviceId}/timeslots` | object `TimeSlot` | Create one weekly slot | Write | On demand + schedule re-read | Calendar, actions | Enabled |
+| `PUT /Schedule/{deviceId}/timeslots/{id}` | object `TimeSlot` | Replace one slot | Write | On demand + schedule re-read | Calendar, actions | Enabled |
+| `DELETE /Schedule/{deviceId}/timeslots/{id}` | none | Delete one slot | Write | On demand + schedule re-read | Calendar, actions | Enabled |
 | `/Users/feature-flags` | booleans | Server features | Read | Start + 6 h | Diagnostics | N/A |
 | `/Users/refresh-token` | token | JWT expiry | Read | Before expiry | Internal | N/A |
 
@@ -161,10 +164,44 @@ lost from 300 s, never before the first frame.
 - Other listeners (for example an add-on) may use the same ports in parallel;
   the sockets are opened with address and port reuse.
 
+## Schedule time slots
+
+The three write endpoints are **from the official app; validate against
+hardware**. They were derived from the app's documented request shapes and have
+not yet been exercised against a unit that reports a schedule.
+
+`TimeSlot` body (all fields are sent on create and update):
+
+| Field | Value sent | Rule enforced before sending |
+| --- | --- | --- |
+| `id` | `0` on create, the slot id on update | Positive integer on update |
+| `dayOfWeek` | `0` (Sunday) to `6` (Saturday), as the app sends it | Number or day name |
+| `startTime`, `endTime` | `HH:mm:00` | Zero seconds, start before end, same day (no slot crosses midnight) |
+| `operatingMode` | String name | Modes of the device type; never the legacy `Turbo` mode |
+| `fanSpeed` | `Low`, `Medium`, `High`, `Turbo` | Never `Night`; `Turbo` only when the unit allows it |
+| `humidityLevel` | `Dry`, `Normal`, `Moist` | |
+| `lightSensorLevel` | `NotAvailable`, `Off`, `Low`, `Medium` | |
+| `scheduleId` | The schedule id, `0` if unknown | |
+
+Behavior:
+
+- Overlapping slots on one day are rejected locally. Slots that only touch (one
+  ends when the next starts) are allowed. The cloud answers HTTP 400
+  (`Schedule.OverlapError`) for an overlap; any HTTP 400 on these endpoints is
+  read as an overlap, as the app does, unless the body names another problem.
+- 404 on update or delete means the slot is unknown; a deleted slot that is
+  already gone counts as deleted.
+- 406 means the unit did not answer, 401 triggers the normal login recovery,
+  429 and 5xx are retried like any command.
+- Every successful write is followed by a `GET /Schedule/{deviceId}`.
+- Writes need the account feature flag `weeklyScheduler` and a unit that
+  reports `isScheduled` other than `NotAvailable`; otherwise the schedule is
+  read-only.
+
 ## Deliberately excluded writes
 
 Factory/device reset, role configuration, house/room/zone mutation, email and
-password changes, account deletion, and schedule time-slot mutation are not
+password changes, and account deletion are not
 exposed. They are either destructive, administrative, insufficiently verified,
 or not needed for normal Home Assistant automations. Enabling or disabling an
 existing schedule is supported through the documented `isScheduleMode` field.
