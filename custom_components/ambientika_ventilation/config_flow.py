@@ -20,6 +20,7 @@ from homeassistant.helpers.selector import (
     NumberSelectorConfig,
     NumberSelectorMode,
 )
+from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from .api import (
     AmbientikaApiClient,
@@ -148,6 +149,20 @@ class AmbientikaConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=USER_SCHEMA,
             errors=errors,
         )
+
+    async def async_step_dhcp(
+        self, discovery_info: DhcpServiceInfo
+    ) -> ConfigFlowResult:
+        """Offer setup when an Ambientika unit announces itself on the network.
+
+        The units use the DHCP host names ``VMC_<MAC>`` and ``GMN_<MAC>``. A
+        unit says nothing about the cloud account, so the credential form
+        follows. Nothing is offered when the account is already configured.
+        """
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
+        await self.async_set_unique_id(f"{DOMAIN}_dhcp")
+        return await self.async_step_user()
 
     async def async_step_reauth(self, _entry_data: dict[str, Any]) -> ConfigFlowResult:
         """Start reauthentication for an existing entry."""

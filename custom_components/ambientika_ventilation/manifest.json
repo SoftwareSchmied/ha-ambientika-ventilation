@@ -3,6 +3,7 @@
   "name": "Ambientika Ventilation",
   "codeowners": ["@SoftwareSchmied"],
   "config_flow": true,
+  "dhcp": [{ "hostname": "vmc_*" }, { "hostname": "gmn_*" }],
   "documentation": "https://github.com/SoftwareSchmied/ha-ambientika-ventilation",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
