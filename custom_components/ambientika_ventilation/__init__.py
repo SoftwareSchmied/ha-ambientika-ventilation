@@ -17,6 +17,7 @@ from homeassistant.util.ssl import client_context
 from .api import (
     AmbientikaApiClient,
     AmbientikaApiError,
+    AmbientikaAuthError,
     AmbientikaToken,
     describe_error,
 )
@@ -105,7 +106,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AmbientikaConfigEntry) -
         session,
         entry.data.get(CONF_BASE_URL, DEFAULT_BASE_URL),
         entry.data[CONF_USERNAME],
-        entry.data[CONF_PASSWORD],
+        entry.data.get(CONF_PASSWORD),
         token=entry.data.get(CONF_TOKEN),
         user_id=entry.data.get(CONF_USER_ID),
         expires_at=entry.data.get(CONF_EXPIRES_AT),
@@ -119,6 +120,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: AmbientikaConfigEntry) -
         try:
             if await api.async_renew_token_if_due(TOKEN_RENEW_BEFORE):
                 LOGGER.info("Renewed the Ambientika token ahead of its expiry")
+        except AmbientikaAuthError:
+            LOGGER.warning(
+                "The Ambientika token could not be renewed; starting reauthentication"
+            )
+            entry.async_start_reauth(hass)
         except AmbientikaApiError as err:
             LOGGER.warning(
                 "Unable to renew the Ambientika token ahead of its expiry (%s); "

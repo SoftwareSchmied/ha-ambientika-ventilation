@@ -32,6 +32,7 @@ from .const import (
     CONF_EXPIRES_AT,
     CONF_SCAN_INTERVAL,
     CONF_TOKEN,
+    CONF_TOKEN_ONLY,
     CONF_USER_ID,
     DEFAULT_BASE_URL,
     DEFAULT_SCAN_INTERVAL,
@@ -47,6 +48,7 @@ USER_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
+        vol.Optional(CONF_TOKEN_ONLY, default=False): bool,
     }
 )
 
@@ -65,14 +67,19 @@ async def _validate_input(
     houses = await client.async_houses_info()
     if not parse_houses(houses):
         raise NoDevicesError
-    return {
+    token_only = bool(user_input.get(CONF_TOKEN_ONLY, False))
+    data: dict[str, Any] = {
         CONF_USERNAME: user_input[CONF_USERNAME],
-        CONF_PASSWORD: user_input[CONF_PASSWORD],
         CONF_BASE_URL: DEFAULT_BASE_URL,
         CONF_USER_ID: token.user_id,
         CONF_TOKEN: token.token,
         CONF_EXPIRES_AT: token.expires_at,
+        CONF_TOKEN_ONLY: token_only,
     }
+    if not token_only:
+        # With the option enabled only the renewable token is stored.
+        data[CONF_PASSWORD] = user_input[CONF_PASSWORD]
+    return data
 
 
 class NoDevicesError(AmbientikaApiError):
@@ -99,12 +106,13 @@ async def _async_try_validate(
     return None
 
 
-def _credentials_schema(username: str) -> vol.Schema:
-    """Return the credential form prefilled with the stored email address."""
+def _credentials_schema(username: str, token_only: bool) -> vol.Schema:
+    """Return the credential form prefilled with the stored settings."""
     return vol.Schema(
         {
             vol.Required(CONF_USERNAME, default=username): str,
             vol.Required(CONF_PASSWORD): str,
+            vol.Optional(CONF_TOKEN_ONLY, default=token_only): bool,
         }
     )
 
@@ -164,7 +172,10 @@ class AmbientikaConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=_credentials_schema(reauth_entry.data.get(CONF_USERNAME, "")),
+            data_schema=_credentials_schema(
+                reauth_entry.data.get(CONF_USERNAME, ""),
+                bool(reauth_entry.data.get(CONF_TOKEN_ONLY, False)),
+            ),
             errors=errors,
         )
 
@@ -184,7 +195,10 @@ class AmbientikaConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reconfigure",
-            data_schema=_credentials_schema(entry.data.get(CONF_USERNAME, "")),
+            data_schema=_credentials_schema(
+                entry.data.get(CONF_USERNAME, ""),
+                bool(entry.data.get(CONF_TOKEN_ONLY, False)),
+            ),
             errors=errors,
         )
 

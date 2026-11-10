@@ -39,6 +39,7 @@ EVENT_DEVICE_CHANGED: Final = f"{DOMAIN}_device_changed"
 CONF_BASE_URL: Final = "base_url"
 CONF_EXPIRES_AT: Final = "expires_at"
 CONF_TOKEN: Final = "token"
+CONF_TOKEN_ONLY: Final = "token_only"
 CONF_USER_ID: Final = "user_id"
 
 PLATFORMS: Final = (
