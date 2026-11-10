@@ -218,17 +218,34 @@ def _expected_power(inp: DatapointInputs) -> bool | None:
 
 
 def _local_power(inp: DatapointInputs) -> bool | None:
-    """On when air moves or the zone is coupled; off only when coupling is idle."""
+    """Claim "on" only for moving air or a non-idle coupling.
+
+    An idle frame makes no claim: in Away mode a running unit idles locally for
+    long periods, so "idle" says nothing about the setting. The effective value
+    then falls back to the expected or cloud value.
+    """
     local = inp.local
     if local is None:
         return None
     if local.running:
         return True
-    if local.coupling is Coupling.IDLE:
-        return False
-    if local.coupling is Coupling.UNKNOWN:
+    if local.coupling in (Coupling.OPPOSITE, Coupling.SAME):
+        return True
+    return None
+
+
+def _local_stage(inp: DatapointInputs) -> LocalSpeed | None:
+    """Report the fan stage only while the unit is running or coupled.
+
+    The unit keeps its last stage in the frame while it is off, so an idle or
+    stopped frame with idle coupling reports no running stage.
+    """
+    local = inp.local
+    if local is None:
         return None
-    return True
+    if local.coupling is Coupling.IDLE and not local.running:
+        return None
+    return local.speed
 
 
 def _local_running(inp: DatapointInputs) -> bool | None:
@@ -319,7 +336,7 @@ _TABLE: tuple[DatapointDescription, ...] = (
         volatile=True,
     ),
     # Local only.
-    DatapointDescription("physical_stage", {Source.LOCAL_UDP: _local("speed")}),
+    DatapointDescription("physical_stage", {Source.LOCAL_UDP: _local_stage}),
     DatapointDescription(
         "direction",
         {Source.LOCAL_UDP: _local("direction")},

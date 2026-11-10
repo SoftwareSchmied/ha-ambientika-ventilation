@@ -123,7 +123,8 @@ def test_expected_extractors() -> None:
 @pytest.mark.parametrize(
     ("coupling", "direction", "expected"),
     [
-        (Coupling.IDLE, Direction.STOPPED, False),
+        (Coupling.IDLE, Direction.STOPPED, None),
+        (Coupling.UNKNOWN, Direction.UNKNOWN, None),
         (Coupling.OPPOSITE, Direction.STOPPED, True),
         (Coupling.SAME, Direction.STOPPED, True),
         (Coupling.UNKNOWN, Direction.STOPPED, None),
@@ -147,6 +148,13 @@ def test_local_running_and_physical_values() -> None:
     assert running(inputs()) is None
     stage = DATAPOINTS["physical_stage"].extractors[Source.LOCAL_UDP]
     assert stage(inputs(local=view())) is LocalSpeed.LOW
+    # The unit keeps its last stage in the frame while it is off.
+    assert stage(inputs(local=view(Coupling.IDLE, Direction.STOPPED))) is None
+    assert stage(inputs(local=view(Coupling.IDLE, Direction.UNKNOWN))) is None
+    assert stage(inputs(local=view(Coupling.IDLE, Direction.EXHAUST))) is LocalSpeed.LOW
+    assert stage(inputs(local=view(Coupling.OPPOSITE, Direction.STOPPED))) is (
+        LocalSpeed.LOW
+    )
     assert stage(inputs()) is None
     assert DATAPOINTS["direction"].stale_value is Direction.UNKNOWN
     assert DATAPOINTS["coupling"].stale_value is Coupling.UNKNOWN
