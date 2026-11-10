@@ -15,6 +15,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util.ssl import client_context
 
+from .analytics_manager import AmbientikaAnalytics, make_analytics_store
 from .api import (
     AmbientikaApiClient,
     AmbientikaApiError,
@@ -40,7 +41,6 @@ from .const import (
     TOKEN_CHECK_INTERVAL,
     TOKEN_RENEW_BEFORE,
 )
-from .analytics_manager import AmbientikaAnalytics, make_analytics_store
 from .coordinator import AmbientikaCoordinator
 from .datapoints import variant_keys
 from .hub import EVALUATE_INTERVAL_S, AmbientikaHub

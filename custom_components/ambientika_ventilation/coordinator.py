@@ -158,16 +158,16 @@ class CommandObserver(Protocol):
     """Receives the outcome of commands (statistics of the derived data)."""
 
     def command_sent(self, serial: str, expected: Mapping[str, str]) -> int:
-        """A command is about to be sent; return a token for the outcome."""
+        """Record a command about to be sent; return a token for the outcome."""
 
     def command_confirmed(self, serial: str, token: int) -> None:
-        """The read-back shows the written values."""
+        """Record that the read-back shows the written values."""
 
     def command_rejected(self, serial: str, token: int) -> None:
-        """The command failed."""
+        """Record a failed command."""
 
     def filter_reset(self, serial: str) -> None:
-        """The cloud accepted a filter reset."""
+        """Record an accepted filter reset."""
 
 
 @dataclass(slots=True)
@@ -1152,8 +1152,10 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             if self.hub is not None:
                 self.hub.set_expected(serial, plan.expected, ttl=EXPECTED_COMMAND_TTL)
             observer = self.command_observer
-            token = None if observer is None else observer.command_sent(
-                serial, plan.expected
+            token = (
+                None
+                if observer is None
+                else observer.command_sent(serial, plan.expected)
             )
             try:
                 await self.api.async_change_mode(

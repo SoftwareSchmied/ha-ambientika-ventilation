@@ -19,6 +19,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from . import AmbientikaRuntimeData
 from .analytics_descriptions import DerivedDescription
 from .analytics_manager import AmbientikaAnalytics, DerivedTarget
+from .const import LOCAL_UDP_OFF
 from .coordinator import AmbientikaCoordinator
 from .derived_entity import AmbientikaDerivedEntity
 from .entity import (
@@ -27,6 +28,7 @@ from .entity import (
     AmbientikaHubEntity,
     HubFields,
     hub_device_serials,
+    hub_entity_wanted,
     with_variants,
 )
 from .hub import AmbientikaHub
@@ -113,9 +115,7 @@ def derived_binary_description(
             else None
         ),
         entity_category=(
-            EntityCategory(derived.entity_category)
-            if derived.entity_category
-            else None
+            EntityCategory(derived.entity_category) if derived.entity_category else None
         ),
         entity_registry_enabled_default=derived.enabled_default,
     )
@@ -134,6 +134,7 @@ async def async_setup_entry(
     known_derived: set[str] = set()
     runtime = entry.runtime_data
     hub = runtime.hub
+    local_off = runtime.local.mode == LOCAL_UDP_OFF
 
     @callback
     def add_new_entities() -> None:
@@ -163,6 +164,7 @@ async def async_setup_entry(
             )
             for serial in sorted(hub_serials)
             for description in HUB_BINARY_SENSORS
+            if hub_entity_wanted(description, local_off)
         )
         derived = [
             target

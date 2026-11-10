@@ -447,7 +447,7 @@ async def test_all_platform_setup_callbacks(hass) -> None:
         await setup(hass, entry, added.extend)
         counts.append(len(added))
 
-    assert counts == [12, 1, 1, 3, 23, 1]
+    assert counts == [12, 1, 1, 3, 22, 1]
     assert entry.async_on_unload.call_count == len(setup_functions)
 
 

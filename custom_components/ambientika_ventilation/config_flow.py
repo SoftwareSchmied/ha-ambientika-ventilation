@@ -17,6 +17,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     BooleanSelector,
+    EntitySelector,
+    EntitySelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -35,21 +37,30 @@ from .api import (
 from .const import (
     CONF_BASE_URL,
     CONF_EXPIRES_AT,
+    CONF_FILTER_BASIS,
     CONF_LOCAL_UDP,
+    CONF_OUTDOOR_HUMIDITY,
+    CONF_OUTDOOR_TEMPERATURE,
+    CONF_OUTDOOR_WEATHER,
     CONF_RAW_VARIANTS,
+    CONF_ROOM_VOLUMES,
     CONF_SCAN_INTERVAL,
     CONF_TOKEN,
     CONF_TOKEN_ONLY,
     CONF_USER_ID,
     DEFAULT_BASE_URL,
+    DEFAULT_FILTER_BASIS,
     DEFAULT_LOCAL_UDP,
     DEFAULT_RAW_VARIANTS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    FILTER_BASES,
     LOCAL_UDP_MODES,
+    MAX_ROOM_VOLUME,
     MAX_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
 )
+from .entity import hub_device_serials
 from .models import parse_houses
 
 LOGGER = logging.getLogger(__name__)
@@ -228,20 +239,37 @@ class AmbientikaConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class AmbientikaOptionsFlow(OptionsFlowWithReload):
-    """Let the user choose the polling interval and the local data options."""
+    """Let the user choose polling, local data and the derived-data inputs."""
+
+    def __init__(self) -> None:
+        """Initialize the flow."""
+        self._options: dict[str, Any] = {}
+        self._units: dict[str, str] = {}
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Show and store the options; the entry reloads afterwards."""
         if user_input is not None:
-            return self.async_create_entry(
-                data={
-                    CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]),
-                    CONF_LOCAL_UDP: user_input[CONF_LOCAL_UDP],
-                    CONF_RAW_VARIANTS: bool(user_input[CONF_RAW_VARIANTS]),
-                }
-            )
+            self._options = {
+                CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]),
+                CONF_LOCAL_UDP: user_input[CONF_LOCAL_UDP],
+                CONF_RAW_VARIANTS: bool(user_input[CONF_RAW_VARIANTS]),
+                CONF_FILTER_BASIS: user_input[CONF_FILTER_BASIS],
+                **{
+                    key: user_input[key]
+                    for key in (
+                        CONF_OUTDOOR_WEATHER,
+                        CONF_OUTDOOR_TEMPERATURE,
+                        CONF_OUTDOOR_HUMIDITY,
+                    )
+                    if user_input.get(key)
+                },
+            }
+            self._units = self._unit_labels()
+            if self._units:
+                return await self.async_step_volumes()
+            return self._finish(self.config_entry.options.get(CONF_ROOM_VOLUMES))
 
         options = self.config_entry.options
         return self.async_show_form(
@@ -277,6 +305,95 @@ class AmbientikaOptionsFlow(OptionsFlowWithReload):
                         CONF_RAW_VARIANTS,
                         default=options.get(CONF_RAW_VARIANTS, DEFAULT_RAW_VARIANTS),
                     ): BooleanSelector(),
+                    vol.Optional(
+                        CONF_OUTDOOR_WEATHER,
+                        description={
+                            "suggested_value": options.get(CONF_OUTDOOR_WEATHER)
+                        },
+                    ): EntitySelector(EntitySelectorConfig(domain="weather")),
+                    vol.Optional(
+                        CONF_OUTDOOR_TEMPERATURE,
+                        description={
+                            "suggested_value": options.get(CONF_OUTDOOR_TEMPERATURE)
+                        },
+                    ): EntitySelector(
+                        EntitySelectorConfig(
+                            domain="sensor", device_class="temperature"
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_OUTDOOR_HUMIDITY,
+                        description={
+                            "suggested_value": options.get(CONF_OUTDOOR_HUMIDITY)
+                        },
+                    ): EntitySelector(
+                        EntitySelectorConfig(domain="sensor", device_class="humidity")
+                    ),
+                    vol.Required(
+                        CONF_FILTER_BASIS,
+                        default=options.get(CONF_FILTER_BASIS, DEFAULT_FILTER_BASIS),
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=list(FILTER_BASES),
+                            mode=SelectSelectorMode.DROPDOWN,
+                            translation_key=CONF_FILTER_BASIS,
+                        )
+                    ),
                 }
             ),
         )
+
+    async def async_step_volumes(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Ask for the room volume that each unit serves (optional)."""
+        if user_input is not None:
+            volumes = {
+                serial: float(user_input[label])
+                for label, serial in self._units.items()
+                if user_input.get(label)
+            }
+            return self._finish(volumes)
+
+        stored = self.config_entry.options.get(CONF_ROOM_VOLUMES) or {}
+        return self.async_show_form(
+            step_id="volumes",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        label, description={"suggested_value": stored.get(serial)}
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=1,
+                            max=MAX_ROOM_VOLUME,
+                            step=0.5,
+                            unit_of_measurement="m\u00b3",
+                            mode=NumberSelectorMode.BOX,
+                        )
+                    )
+                    for label, serial in self._units.items()
+                }
+            ),
+        )
+
+    def _unit_labels(self) -> dict[str, str]:
+        """Return the unit serials by form label (the unit name)."""
+        runtime = getattr(self.config_entry, "runtime_data", None)
+        if runtime is None:
+            return {}
+        labels: dict[str, str] = {}
+        for serial in sorted(hub_device_serials(runtime.coordinator)):
+            name = runtime.coordinator.data.devices[serial].device.name or "Unit"
+            label, number = name, 1
+            while label in labels:
+                number += 1
+                label = f"{name} ({number})"
+            labels[label] = serial
+        return labels
+
+    def _finish(self, volumes: dict[str, float] | None) -> ConfigFlowResult:
+        """Store all options; the entry reloads afterwards."""
+        data = dict(self._options)
+        if volumes:
+            data[CONF_ROOM_VOLUMES] = volumes
+        return self.async_create_entry(data=data)

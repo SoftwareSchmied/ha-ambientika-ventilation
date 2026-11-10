@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -23,6 +23,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from . import AmbientikaRuntimeData
@@ -32,6 +33,7 @@ from .const import (
     AIR_QUALITY_LEVELS,
     API_TO_HA,
     FILTER_STATUSES,
+    LOCAL_UDP_OFF,
     REPORTED_OPERATING_MODES,
 )
 from .coordinator import AmbientikaCoordinator
@@ -41,7 +43,9 @@ from .entity import (
     AmbientikaEntity,
     AmbientikaHubEntity,
     HubFields,
+    house_device_info,
     hub_device_serials,
+    hub_entity_wanted,
     with_variants,
 )
 from .hub import (
@@ -88,6 +92,13 @@ class AmbientikaCloudSensorDescription(SensorEntityDescription):
     """Describe a cloud-health diagnostic of the account."""
 
     value_fn: Callable[[AmbientikaHub], Any]
+
+
+@dataclass(frozen=True, kw_only=True)
+class AmbientikaHouseSensorDescription(SensorEntityDescription):
+    """Describe a diagnostic value of the house (location and time)."""
+
+    value_fn: DeviceValueFn
 
 
 SENSORS = (
@@ -285,11 +296,23 @@ def _options(enum: type[Direction] | type[Coupling] | type[LocalSpeed]) -> list[
     return [item.value for item in enum if item.value != "unknown"]
 
 
+_LAST_SEEN, _LAST_SEEN_CLOUD, _LAST_SEEN_LOCAL = with_variants(
+    AmbientikaHubSensorDescription(
+        key="last_seen",
+        translation_key="last_seen",
+        datapoint="last_seen",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        throttled=True,
+    )
+)
+
 HUB_SENSORS: tuple[AmbientikaHubSensorDescription, ...] = (
     AmbientikaHubSensorDescription(
         key="direction",
         translation_key="direction",
         datapoint="direction",
+        local_only=True,
         device_class=SensorDeviceClass.ENUM,
         options=_options(Direction),
     ),
@@ -297,6 +320,7 @@ HUB_SENSORS: tuple[AmbientikaHubSensorDescription, ...] = (
         key="physical_stage",
         translation_key="physical_stage",
         datapoint="physical_stage",
+        local_only=True,
         device_class=SensorDeviceClass.ENUM,
         options=_options(LocalSpeed),
     ),
@@ -304,6 +328,7 @@ HUB_SENSORS: tuple[AmbientikaHubSensorDescription, ...] = (
         key="coupling",
         translation_key="coupling",
         datapoint="coupling",
+        local_only=True,
         device_class=SensorDeviceClass.ENUM,
         options=_options(Coupling),
     ),
@@ -324,6 +349,7 @@ HUB_SENSORS: tuple[AmbientikaHubSensorDescription, ...] = (
         key="heartbeat_age",
         translation_key="heartbeat_age",
         datapoint="heartbeat_age",
+        local_only=True,
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.SECONDS,
         suggested_display_precision=0,
@@ -331,25 +357,9 @@ HUB_SENSORS: tuple[AmbientikaHubSensorDescription, ...] = (
         entity_registry_enabled_default=False,
         throttled=True,
     ),
-    AmbientikaHubSensorDescription(
-        key="last_local_frame",
-        translation_key="last_local_frame",
-        datapoint="last_seen",
-        variant="local",
-        device_class=SensorDeviceClass.TIMESTAMP,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        throttled=True,
-    ),
-    *with_variants(
-        AmbientikaHubSensorDescription(
-            key="last_seen",
-            translation_key="last_seen",
-            datapoint="last_seen",
-            device_class=SensorDeviceClass.TIMESTAMP,
-            entity_category=EntityCategory.DIAGNOSTIC,
-            throttled=True,
-        )
-    ),
+    _LAST_SEEN,
+    _LAST_SEEN_CLOUD,
+    replace(_LAST_SEEN_LOCAL, entity_registry_enabled_default=True),
 )
 
 CLOUD_SENSORS: tuple[AmbientikaCloudSensorDescription, ...] = (
@@ -413,14 +423,107 @@ def derived_sensor_description(derived: DerivedDescription) -> SensorEntityDescr
             SensorStateClass(derived.state_class) if derived.state_class else None
         ),
         entity_category=(
-            EntityCategory(derived.entity_category)
-            if derived.entity_category
-            else None
+            EntityCategory(derived.entity_category) if derived.entity_category else None
         ),
         entity_registry_enabled_default=derived.enabled_default,
         suggested_display_precision=derived.precision,
         options=list(derived.options) or None,
     )
+
+
+def _house_time(device: AmbientikaDevice) -> datetime | None:
+    """Return the house time reported at the last discovery as an aware time."""
+    if device.house_current_time is None:
+        return None
+    parsed = dt_util.parse_datetime(device.house_current_time)
+    if parsed is None:
+        return None
+    if parsed.tzinfo is None:
+        zone = (
+            dt_util.get_time_zone(device.house_iana_timezone)
+            if device.house_iana_timezone
+            else None
+        )
+        parsed = parsed.replace(tzinfo=zone or dt_util.get_default_time_zone())
+    return parsed
+
+
+def _house_time_zone(device: AmbientikaDevice) -> str | None:
+    if device.house_iana_timezone:
+        return device.house_iana_timezone
+    if device.house_timezone is not None:
+        return f"UTC{device.house_timezone:+d}"
+    return None
+
+
+HOUSE_SENSORS = (
+    AmbientikaHouseSensorDescription(
+        key="address",
+        translation_key="house_address",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.house_address,
+    ),
+    AmbientikaHouseSensorDescription(
+        key="latitude",
+        translation_key="house_latitude",
+        native_unit_of_measurement="°",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.house_latitude,
+    ),
+    AmbientikaHouseSensorDescription(
+        key="longitude",
+        translation_key="house_longitude",
+        native_unit_of_measurement="°",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.house_longitude,
+    ),
+    AmbientikaHouseSensorDescription(
+        key="time_zone",
+        translation_key="house_time_zone",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=_house_time_zone,
+    ),
+    AmbientikaHouseSensorDescription(
+        key="time",
+        translation_key="house_time",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=_house_time,
+    ),
+)
+
+
+def _house_device(
+    coordinator: AmbientikaCoordinator, house_id: int
+) -> AmbientikaDevice:
+    """Return a device of the house; its house fields are the same for all."""
+    return next(
+        item.device
+        for item in coordinator.data.devices.values()
+        if item.device.house_id == house_id
+    )
+
+
+def _house_value(
+    coordinator: AmbientikaCoordinator,
+    house_id: int,
+    description: AmbientikaHouseSensorDescription,
+) -> Any:
+    """Return the value of a house sensor, None if the house or value is gone."""
+    device = next(
+        (
+            item.device
+            for item in coordinator.data.devices.values()
+            if item.device.house_id == house_id
+        ),
+        None,
+    )
+    return None if device is None else description.value_fn(device)
 
 
 def _enum_state(value: object, known: tuple[str, ...]) -> str | None:
@@ -445,8 +548,10 @@ async def async_setup_entry(
     known_schedules: set[str] = set()
     known_hub: set[str] = set()
     known_derived: set[str] = set()
+    known_house: set[tuple[int, str]] = set()
     runtime = entry.runtime_data
     hub = runtime.hub
+    local_off = runtime.local.mode == LOCAL_UDP_OFF
 
     @callback
     def add_new_entities() -> None:
@@ -481,6 +586,19 @@ async def async_setup_entry(
             )
             for serial in sorted(hub_serials)
             for description in HUB_SENSORS
+            if hub_entity_wanted(description, local_off)
+        )
+        houses = {
+            house_id
+            for device_data in coordinator.data.devices.values()
+            if (house_id := device_data.device.house_id) is not None
+        }
+        entities.extend(
+            AmbientikaHouseSensor(coordinator, house_id, description)
+            for house_id in sorted(houses)
+            for description in HOUSE_SENSORS
+            if (house_id, description.key) not in known_house
+            and _house_value(coordinator, house_id, description) is not None
         )
         derived = [
             target
@@ -493,6 +611,12 @@ async def async_setup_entry(
             known_devices.update(serials)
             known_hub.update(hub_serials)
             known_derived.update(target.unique_id for target in derived)
+            known_house.update(
+                (house_id, description.key)
+                for house_id in houses
+                for description in HOUSE_SENSORS
+                if _house_value(coordinator, house_id, description) is not None
+            )
 
     async_add_entities(
         AmbientikaCloudSensor(entry.entry_id, hub, description)
@@ -700,8 +824,45 @@ class AmbientikaDerivedSensor(AmbientikaDerivedEntity, SensorEntity):
 
     @property
     def native_value(self) -> Any:
-        """Return the last reported value; enum values outside the options are unknown."""
+        """Return the last reported value (enum values must be known options)."""
         options = self._derived.options
         if options and self._value not in options:
             return None
         return self._value
+
+
+class AmbientikaHouseSensor(CoordinatorEntity[AmbientikaCoordinator], SensorEntity):
+    """Diagnostic value of the house, shown on the house device.
+
+    Address, coordinates and the house time are identifying data: they are
+    separate entities that are disabled by default, never attributes of other
+    entities and never part of the diagnostics.
+    """
+
+    _attr_has_entity_name = True
+    entity_description: AmbientikaHouseSensorDescription
+
+    def __init__(
+        self,
+        coordinator: AmbientikaCoordinator,
+        house_id: int,
+        description: AmbientikaHouseSensorDescription,
+    ) -> None:
+        """Initialize the sensor of one house."""
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._house_id = house_id
+        self._attr_unique_id = f"{house_id}_{description.key}"
+        self._attr_device_info = house_device_info(
+            house_id, _house_device(coordinator, house_id).house_name
+        )
+
+    @property
+    def native_value(self) -> Any:
+        """Return the value reported for the house."""
+        return _house_value(self.coordinator, self._house_id, self.entity_description)
+
+    @property
+    def available(self) -> bool:
+        """Report a state while the cloud reports the house value."""
+        return super().available and self.native_value is not None

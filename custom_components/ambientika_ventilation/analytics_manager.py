@@ -75,7 +75,7 @@ from .const import (
 )
 from .coordinator import AmbientikaCoordinator
 from .datapoints import Source
-from .entity import hub_device_serials, house_device_info, unit_device_info
+from .entity import house_device_info, hub_device_serials, unit_device_info
 from .hub import AmbientikaHub
 from .local.models import Coupling
 from .local_manager import AmbientikaLocal
@@ -174,7 +174,7 @@ class AmbientikaAnalytics:
         clock: Callable[[], float] = time.monotonic,
         wall_clock: Callable[[], datetime] = dt_util.now,
     ) -> None:
-        """Create the runtime; call :meth:`async_load`, :meth:`attach`, :meth:`refresh`."""
+        """Create the runtime (then load, attach and refresh it)."""
         self._hass = hass
         self._entry = entry
         self._coordinator = coordinator
@@ -201,7 +201,7 @@ class AmbientikaAnalytics:
         self.engine.import_state(await self._store.async_load())
 
     def attach(self) -> Callable[[], None]:
-        """Follow the coordinator, the local changes, the timer and the outdoor entities."""
+        """Follow coordinator, local changes, the timer and the outdoor entities."""
         unsubscribers = [
             self._coordinator.async_add_listener(self._on_coordinator),
             self._local.add_change_listener(self._on_local_change),
@@ -343,7 +343,9 @@ class AmbientikaAnalytics:
                     )
         return targets
 
-    def _requires(self, description: DerivedDescription, serial: str | None = None) -> bool:
+    def _requires(
+        self, description: DerivedDescription, serial: str | None = None
+    ) -> bool:
         return all(self.requirement_met(req, serial) for req in description.requires)
 
     # ---------------------------------------------------------- entity access
@@ -364,7 +366,9 @@ class AmbientikaAnalytics:
 
         return unsubscribe
 
-    def _publish(self, scope_id: str, values: Mapping[str, Any], changed: Mapping[str, Any]) -> None:
+    def _publish(
+        self, scope_id: str, values: Mapping[str, Any], changed: Mapping[str, Any]
+    ) -> None:
         self._values[scope_id] = values
         if not changed:
             return
@@ -427,7 +431,7 @@ class AmbientikaAnalytics:
 
     @callback
     def _on_local_change(self, serials: tuple[str, ...]) -> None:
-        """A local frame changed something: confirm commands and update."""
+        """Confirm commands with the changed local state and update."""
         now = self._clock()
         for serial in serials:
             for token, pending in list(self._pending.get(serial, {}).items()):
@@ -514,17 +518,17 @@ class AmbientikaAnalytics:
         return token
 
     def command_confirmed(self, serial: str, token: int) -> None:
-        """The cloud read-back shows the command."""
+        """Record that the cloud read-back shows the command."""
         self.engine.command_confirmed(serial, token, self._clock(), source="cloud")
 
     def command_rejected(self, serial: str, token: int) -> None:
-        """The command failed (cloud error, offline unit, authentication)."""
+        """Record a failed command (cloud error, offline unit, authentication)."""
         self._pending.get(serial, {}).pop(token, None)
         self.engine.command_rejected(serial, token, self._clock())
         self.refresh()
 
     def filter_reset(self, serial: str) -> None:
-        """The cloud accepted a filter reset: restart the filter counters."""
+        """Restart the filter counters after the cloud accepted a reset."""
         self.engine.reset_filter(serial, self._wall_clock())
         self.refresh()
 

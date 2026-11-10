@@ -77,7 +77,9 @@ def unit_device_info(serial: str, device: AmbientikaDevice) -> DeviceInfo:
         name=device.name,
         model=model,
         hw_version=(
-            device.device_subtype if device.device_subtype not in (None, "None") else None
+            device.device_subtype
+            if device.device_subtype not in (None, "None")
+            else None
         ),
         serial_number=serial,
         suggested_area=device.room_name,
@@ -115,6 +117,8 @@ class HubFields:
     """``cloud`` or ``local`` to show one raw source, None for the effective value."""
     throttled: bool = False
     """Volatile value, written at most once per :data:`THROTTLE_INTERVAL`."""
+    local_only: bool = False
+    """Exists only with local reception (``local_udp`` is not ``off``)."""
 
 
 def with_variants[D: HubFields](description: D) -> tuple[D, D, D]:
@@ -136,6 +140,15 @@ def with_variants[D: HubFields](description: D) -> tuple[D, D, D]:
         for variant in VARIANT_SOURCES
     )
     return description, cloud, local
+
+
+def hub_entity_wanted(fields: HubFields, local_off: bool) -> bool:
+    """Return whether a hub entity is created.
+
+    Local-only entities and the raw ``_local`` variants make no sense while the
+    local reception is switched off.
+    """
+    return not (local_off and (fields.local_only or fields.variant == "local"))
 
 
 def hub_device_serials(coordinator: AmbientikaCoordinator) -> set[str]:

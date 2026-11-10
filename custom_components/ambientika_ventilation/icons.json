@@ -1,7 +1,9 @@
 {
   "entity": {
     "sensor": {
-      "signal_strength": { "default": "mdi:signal" },
+      "signal_strength": {
+        "default": "mdi:signal"
+      },
       "air_quality": {
         "default": "mdi:air-filter",
         "state": {
@@ -20,55 +22,518 @@
           "bad": "mdi:air-filter-alert"
         }
       },
-      "packet_type": { "default": "mdi:package-variant-closed" },
-      "last_operating_mode": { "default": "mdi:fan-clock" },
-      "device_type": { "default": "mdi:hvac" },
-      "device_subtype": { "default": "mdi:hvac" },
-      "device_role": { "default": "mdi:swap-horizontal-circle-outline" },
-      "micro_firmware": { "default": "mdi:chip" },
-      "radio_firmware": { "default": "mdi:chip" },
-      "radio_at_firmware": { "default": "mdi:chip" },
-      "house": { "default": "mdi:home-outline" },
-      "zone": { "default": "mdi:vector-square" },
-      "room": { "default": "mdi:door" },
-      "device_id": { "default": "mdi:identifier" },
-      "house_id": { "default": "mdi:identifier" },
-      "room_id": { "default": "mdi:identifier" },
-      "zone_id": { "default": "mdi:identifier" },
-      "zone_index": { "default": "mdi:numeric" },
-      "schedule_entries": { "default": "mdi:calendar-clock" }
+      "packet_type": {
+        "default": "mdi:package-variant-closed"
+      },
+      "last_operating_mode": {
+        "default": "mdi:fan-clock"
+      },
+      "device_type": {
+        "default": "mdi:hvac"
+      },
+      "device_subtype": {
+        "default": "mdi:hvac"
+      },
+      "device_role": {
+        "default": "mdi:swap-horizontal-circle-outline"
+      },
+      "micro_firmware": {
+        "default": "mdi:chip"
+      },
+      "radio_firmware": {
+        "default": "mdi:chip"
+      },
+      "radio_at_firmware": {
+        "default": "mdi:chip"
+      },
+      "house": {
+        "default": "mdi:home-outline"
+      },
+      "zone": {
+        "default": "mdi:vector-square"
+      },
+      "room": {
+        "default": "mdi:door"
+      },
+      "device_id": {
+        "default": "mdi:identifier"
+      },
+      "house_id": {
+        "default": "mdi:identifier"
+      },
+      "room_id": {
+        "default": "mdi:identifier"
+      },
+      "zone_id": {
+        "default": "mdi:identifier"
+      },
+      "zone_index": {
+        "default": "mdi:numeric"
+      },
+      "schedule_entries": {
+        "default": "mdi:calendar-clock"
+      },
+      "operating_hours": {
+        "default": "mdi:timer"
+      },
+      "on_hours": {
+        "default": "mdi:timer-outline"
+      },
+      "operating_hours_today": {
+        "default": "mdi:timer-sand"
+      },
+      "runtime_mode_smart": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_mode_auto": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_mode_heat_recovery": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_mode_night": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_mode_away": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_mode_surveillance": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_mode_timed_extraction": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_mode_extraction": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_mode_intake": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_mode_master_slave_flow": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_mode_slave_master_flow": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_mode_off": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_mode_turbo": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_stage_night": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_stage_low": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_stage_medium": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_stage_high": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_stage_turbo": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_direction_exhaust": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_direction_intake": {
+        "default": "mdi:timer-outline"
+      },
+      "runtime_direction_stopped": {
+        "default": "mdi:timer-outline"
+      },
+      "reversals": {
+        "default": "mdi:swap-horizontal"
+      },
+      "heat_recovery_cycles": {
+        "default": "mdi:sync"
+      },
+      "half_cycle_duration": {
+        "default": "mdi:timer-sand"
+      },
+      "airflow": {
+        "default": "mdi:weather-windy"
+      },
+      "fresh_air_flow": {
+        "default": "mdi:weather-windy"
+      },
+      "air_volume": {
+        "default": "mdi:cube-outline"
+      },
+      "air_change_rate": {
+        "default": "mdi:autorenew"
+      },
+      "power_estimate": {
+        "default": "mdi:flash"
+      },
+      "energy_estimate": {
+        "default": "mdi:lightning-bolt"
+      },
+      "heat_recovered_power": {
+        "default": "mdi:heat-wave"
+      },
+      "heat_recovered_energy": {
+        "default": "mdi:heat-wave"
+      },
+      "ventilation_loss_power": {
+        "default": "mdi:home-thermometer-outline"
+      },
+      "ventilation_loss_energy": {
+        "default": "mdi:home-thermometer-outline"
+      },
+      "moisture_recovered": {
+        "default": "mdi:water-sync"
+      },
+      "dew_point": {
+        "default": "mdi:thermometer-water"
+      },
+      "absolute_humidity": {
+        "default": "mdi:water-percent"
+      },
+      "humidity_setpoint": {
+        "default": "mdi:target"
+      },
+      "humidity_setpoint_distance": {
+        "default": "mdi:arrow-expand-horizontal"
+      },
+      "comfort": {
+        "default": "mdi:emoticon-outline",
+        "state": {
+          "too_dry": "mdi:water-off",
+          "dry": "mdi:water-minus",
+          "comfortable": "mdi:emoticon-happy-outline",
+          "humid": "mdi:water-plus",
+          "too_humid": "mdi:water-alert"
+        }
+      },
+      "room_temperature": {
+        "default": "mdi:home-thermometer"
+      },
+      "room_humidity": {
+        "default": "mdi:water-percent"
+      },
+      "measurement_context": {
+        "default": "mdi:information-outline"
+      },
+      "measurement_last_valid": {
+        "default": "mdi:clock-check-outline"
+      },
+      "drying_potential": {
+        "default": "mdi:water-minus"
+      },
+      "air_quality_index": {
+        "default": "mdi:air-filter"
+      },
+      "filter_hours": {
+        "default": "mdi:air-filter"
+      },
+      "filter_remaining_hours": {
+        "default": "mdi:air-filter"
+      },
+      "filter_alarm_predicted": {
+        "default": "mdi:calendar-alert"
+      },
+      "filter_clean_due": {
+        "default": "mdi:calendar-alert"
+      },
+      "filter_replace_due": {
+        "default": "mdi:calendar-alert"
+      },
+      "filter_last_reset": {
+        "default": "mdi:history"
+      },
+      "filter_medium_hours": {
+        "default": "mdi:air-filter"
+      },
+      "filter_alarm_hours": {
+        "default": "mdi:air-filter-alert"
+      },
+      "smart_behaviour": {
+        "default": "mdi:head-cog-outline",
+        "state": {
+          "idle": "mdi:sleep",
+          "heat_recovery": "mdi:heat-wave",
+          "night_heat_recovery": "mdi:weather-night",
+          "free_cooling": "mdi:snowflake"
+        }
+      },
+      "timed_exhaust_ends": {
+        "default": "mdi:timer-sand"
+      },
+      "damper_state": {
+        "default": "mdi:valve",
+        "state": {
+          "closed": "mdi:valve-closed",
+          "opening": "mdi:valve",
+          "open": "mdi:valve-open",
+          "closing": "mdi:valve"
+        }
+      },
+      "humidity_alarm_duration": {
+        "default": "mdi:water-alert"
+      },
+      "humidity_alarm_today": {
+        "default": "mdi:water-alert"
+      },
+      "humidity_alarm_current": {
+        "default": "mdi:water-alert"
+      },
+      "night_alarm_duration": {
+        "default": "mdi:weather-night"
+      },
+      "night_alarm_today": {
+        "default": "mdi:weather-night"
+      },
+      "night_alarm_current": {
+        "default": "mdi:weather-night"
+      },
+      "command_latency": {
+        "default": "mdi:timer-sand"
+      },
+      "command_latency_cloud": {
+        "default": "mdi:cloud-clock-outline"
+      },
+      "command_latency_local": {
+        "default": "mdi:lan"
+      },
+      "command_latency_average": {
+        "default": "mdi:timer-sand"
+      },
+      "commands_sent": {
+        "default": "mdi:send"
+      },
+      "commands_confirmed": {
+        "default": "mdi:check-all"
+      },
+      "commands_unconfirmed": {
+        "default": "mdi:send-clock"
+      },
+      "commands_rejected": {
+        "default": "mdi:send-lock"
+      },
+      "zone_airflow": {
+        "default": "mdi:weather-windy"
+      },
+      "zone_power": {
+        "default": "mdi:flash"
+      },
+      "zone_energy": {
+        "default": "mdi:lightning-bolt"
+      },
+      "zone_air_volume": {
+        "default": "mdi:cube-outline"
+      },
+      "zone_running_units": {
+        "default": "mdi:fan"
+      },
+      "zone_units": {
+        "default": "mdi:counter"
+      },
+      "zone_heat_recovered_power": {
+        "default": "mdi:heat-wave"
+      },
+      "zone_heat_recovered_energy": {
+        "default": "mdi:heat-wave"
+      },
+      "house_airflow": {
+        "default": "mdi:weather-windy"
+      },
+      "house_power": {
+        "default": "mdi:flash"
+      },
+      "house_energy": {
+        "default": "mdi:lightning-bolt"
+      },
+      "house_air_volume": {
+        "default": "mdi:cube-outline"
+      },
+      "house_running_units": {
+        "default": "mdi:fan"
+      },
+      "house_units": {
+        "default": "mdi:counter"
+      },
+      "house_heat_recovered_power": {
+        "default": "mdi:heat-wave"
+      },
+      "house_heat_recovered_energy": {
+        "default": "mdi:heat-wave"
+      },
+      "outdoor_dew_point": {
+        "default": "mdi:thermometer-water"
+      },
+      "outdoor_absolute_humidity": {
+        "default": "mdi:water-percent"
+      },
+      "house_address": {
+        "default": "mdi:map-marker"
+      },
+      "house_latitude": {
+        "default": "mdi:latitude"
+      },
+      "house_longitude": {
+        "default": "mdi:longitude"
+      },
+      "house_time_zone": {
+        "default": "mdi:earth"
+      },
+      "house_time": {
+        "default": "mdi:clock-outline"
+      },
+      "direction": {
+        "default": "mdi:arrow-left-right"
+      },
+      "physical_stage": {
+        "default": "mdi:fan"
+      },
+      "coupling": {
+        "default": "mdi:link-variant"
+      },
+      "data_source": {
+        "default": "mdi:database-arrow-right-outline"
+      },
+      "heartbeat_age": {
+        "default": "mdi:heart-pulse"
+      },
+      "last_seen": {
+        "default": "mdi:clock-check-outline"
+      },
+      "last_seen_cloud": {
+        "default": "mdi:cloud-clock-outline"
+      },
+      "last_seen_local": {
+        "default": "mdi:lan"
+      },
+      "cloud_consecutive_failures": {
+        "default": "mdi:cloud-alert-outline"
+      },
+      "cloud_success_rate": {
+        "default": "mdi:cloud-check-outline"
+      },
+      "cloud_last_latency": {
+        "default": "mdi:cloud-clock-outline"
+      },
+      "cloud_last_success": {
+        "default": "mdi:cloud-check-outline"
+      },
+      "cloud_last_failure_kind": {
+        "default": "mdi:cloud-alert-outline"
+      }
     },
     "binary_sensor": {
       "humidity_alarm": {
         "default": "mdi:water-check",
-        "state": { "on": "mdi:water-alert" }
+        "state": {
+          "on": "mdi:water-alert"
+        }
       },
       "filter_problem": {
         "default": "mdi:air-filter",
-        "state": { "on": "mdi:air-filter-alert" }
+        "state": {
+          "on": "mdi:air-filter-alert"
+        }
       },
       "night": {
         "default": "mdi:weather-sunny",
-        "state": { "on": "mdi:weather-night" }
+        "state": {
+          "on": "mdi:weather-night"
+        }
       },
       "schedule": {
         "default": "mdi:calendar-blank",
-        "state": { "on": "mdi:calendar-clock" }
+        "state": {
+          "on": "mdi:calendar-clock"
+        }
+      },
+      "measurement_valid": {
+        "default": "mdi:check-decagram"
+      },
+      "outdoor_humidifies": {
+        "default": "mdi:water-plus"
+      },
+      "humidity_exhaust_active": {
+        "default": "mdi:water-alert"
+      },
+      "night_reduction_active": {
+        "default": "mdi:weather-night"
+      },
+      "timed_exhaust_active": {
+        "default": "mdi:timer-cog-outline"
+      },
+      "free_cooling_active": {
+        "default": "mdi:snowflake"
+      },
+      "cloud_connection": {
+        "default": "mdi:cloud-check-outline",
+        "state": {
+          "off": "mdi:cloud-off-outline"
+        }
+      },
+      "cloud_reachable": {
+        "default": "mdi:cloud-check-outline",
+        "state": {
+          "off": "mdi:cloud-off-outline"
+        }
+      },
+      "power": {
+        "default": "mdi:power"
+      },
+      "power_cloud": {
+        "default": "mdi:power"
+      },
+      "power_local": {
+        "default": "mdi:power"
+      },
+      "running": {
+        "default": "mdi:fan",
+        "state": {
+          "off": "mdi:fan-off"
+        }
+      },
+      "running_cloud": {
+        "default": "mdi:fan",
+        "state": {
+          "off": "mdi:fan-off"
+        }
+      },
+      "running_local": {
+        "default": "mdi:fan",
+        "state": {
+          "off": "mdi:fan-off"
+        }
       }
     },
     "select": {
-      "operating_mode": { "default": "mdi:fan-auto" },
-      "humidity_level": { "default": "mdi:water-percent" },
-      "light_sensor_level": { "default": "mdi:brightness-6" }
+      "operating_mode": {
+        "default": "mdi:fan-auto"
+      },
+      "humidity_level": {
+        "default": "mdi:water-percent"
+      },
+      "light_sensor_level": {
+        "default": "mdi:brightness-6"
+      }
     },
     "switch": {
       "schedule": {
         "default": "mdi:calendar-blank",
-        "state": { "on": "mdi:calendar-clock" }
+        "state": {
+          "on": "mdi:calendar-clock"
+        }
       }
     },
     "button": {
-      "reset_filter": { "default": "mdi:air-filter" }
+      "reset_filter": {
+        "default": "mdi:air-filter"
+      }
+    },
+    "calendar": {
+      "schedule": {
+        "default": "mdi:calendar-clock"
+      }
     }
   }
 }

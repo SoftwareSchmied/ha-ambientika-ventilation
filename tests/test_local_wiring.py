@@ -57,6 +57,7 @@ def cloud(houses_payload, status_payload):
             "custom_components.ambientika_ventilation.AmbientikaApiClient",
             return_value=api,
         ),
+        fake_listeners(),
     ):
         yield api
 
@@ -68,7 +69,7 @@ async def setup_entry(
         domain=DOMAIN,
         unique_id=f"{DOMAIN}_42",
         data=DATA,
-        options={"local_udp": "off", **(options or {})},
+        options={"local_udp": "on", **(options or {})},
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -178,7 +179,6 @@ EFFECTIVE = {
         "physical_stage",
         "coupling",
         "data_source",
-        "last_local_frame",
         "last_seen",
     ],
 }
@@ -189,7 +189,7 @@ VARIANTS = {
         "running_cloud",
         "running_local",
     ],
-    "sensor": ["last_seen_cloud", "last_seen_local"],
+    "sensor": ["last_seen_cloud"],
 }
 
 
@@ -207,6 +207,12 @@ async def test_effective_entities_exist_and_variants_are_disabled(hass, cloud) -
             assert entry is not None
             assert entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION, key
             assert hass.states.get(entry.entity_id) is None
+    # The local last-seen time replaces the former last local frame entity.
+    last_local = registry.async_get(
+        entity_id(hass, "sensor", f"{MASTER}_last_seen_local")
+    )
+    assert last_local is not None and last_local.disabled_by is None
+    assert registry.async_get_entity_id("sensor", DOMAIN, f"{MASTER}_last_local_frame") is None
     heartbeat = registry.async_get(entity_id(hass, "sensor", f"{MASTER}_heartbeat_age"))
     assert heartbeat is not None
     assert heartbeat.disabled_by is er.RegistryEntryDisabler.INTEGRATION
@@ -349,10 +355,10 @@ async def test_heartbeats_do_not_write_states(hass, cloud) -> None:
 
 
 async def test_throttled_entities_write_once_per_minute(hass, cloud) -> None:
-    """The last local frame follows heartbeats only on the 60 s timer."""
+    """The local last-seen time follows heartbeats only on the 60 s timer."""
     entry = await setup_entry(hass)
     runtime = entry.runtime_data
-    unique = f"{MASTER}_last_local_frame"
+    unique = f"{MASTER}_last_seen_local"
     first_wall = (dt_util.utcnow() - timedelta(seconds=30)).replace(microsecond=0)
     runtime.local._on_state(zone_state(n=1, wall=first_wall), True)
     await hass.async_block_till_done()
@@ -417,7 +423,7 @@ async def test_raw_variants_option_enables_the_variant_entities(hass, cloud) -> 
     assert await hass.config_entries.async_unload(entry.entry_id)
 
     hass.config_entries.async_update_entry(
-        entry, options={"local_udp": "off", "raw_variants": True}
+        entry, options={"local_udp": "on", "raw_variants": True}
     )
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -501,8 +507,17 @@ async def test_options_flow_offers_local_options_with_defaults(hass) -> None:
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
 
-    defaults = {str(key): key.default() for key in result["data_schema"].schema}
-    assert defaults == {"scan_interval": 60, "local_udp": "auto", "raw_variants": False}
+    defaults = {
+        str(key): key.default()
+        for key in result["data_schema"].schema
+        if callable(key.default)
+    }
+    assert defaults == {
+        "scan_interval": 60,
+        "local_udp": "auto",
+        "raw_variants": False,
+        "filter_basis": "operating",
+    }
 
 
 async def test_options_flow_saves_local_options(hass) -> None:
@@ -514,13 +529,19 @@ async def test_options_flow_saves_local_options(hass) -> None:
         result = await hass.config_entries.options.async_init(entry.entry_id)
         result = await hass.config_entries.options.async_configure(
             result["flow_id"],
-            {"scan_interval": 90, "local_udp": "on", "raw_variants": True},
+            {
+                "scan_interval": 90,
+                "local_udp": "on",
+                "raw_variants": True,
+                "filter_basis": "operating",
+            },
         )
 
     assert entry.options == {
         "scan_interval": 90,
         "local_udp": "on",
         "raw_variants": True,
+        "filter_basis": "operating",
     }
     reload.assert_called_once_with(entry.entry_id)
 
