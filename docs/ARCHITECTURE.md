@@ -168,6 +168,8 @@ for example a cloud outage while UDP still flows) or `offline`.
 `export_topology()` / `import_topology()` exchange plain dictionaries (device
 serial, house, zone index, role, type) for a Home Assistant `Store`
 (`.storage/ambientika_ventilation.<entry id>`, together with the last probe
-result), so UDP frames can be mapped to devices before the first cloud poll.
-The topology is imported at start and saved (delayed) when it changes; the
-file is removed with the config entry.
+result). The topology is imported at start and saved (delayed) when it
+changes; the file is removed with the config entry. Setup currently still
+requires a successful first cloud poll, so the cache does not yet allow a
+local-only start while the cloud is unreachable; that is planned for a later
+release.
