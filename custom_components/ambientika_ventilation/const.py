@@ -180,3 +180,27 @@ ISSUE_LOCAL_UDP_NO_FRAMES: Final = "local_udp_no_frames"
 
 # Identifier prefix of the account-level cloud device (not a unit serial).
 CLOUD_DEVICE_PREFIX: Final = "cloud_"
+
+# --- Derived data -----------------------------------------------------------
+
+CONF_OUTDOOR_WEATHER: Final = "outdoor_weather"
+CONF_OUTDOOR_TEMPERATURE: Final = "outdoor_temperature"
+CONF_OUTDOOR_HUMIDITY: Final = "outdoor_humidity"
+CONF_ROOM_VOLUMES: Final = "room_volumes"
+CONF_FILTER_BASIS: Final = "filter_basis"
+FILTER_BASIS_OPERATING: Final = "operating"
+FILTER_BASIS_ON_TIME: Final = "on_time"
+FILTER_BASES: Final = (FILTER_BASIS_OPERATING, FILTER_BASIS_ON_TIME)
+DEFAULT_FILTER_BASIS: Final = FILTER_BASIS_OPERATING
+MAX_ROOM_VOLUME: Final = 1000.0
+"""Upper bound (m3) accepted for the room volume of one unit."""
+
+ANALYTICS_STORE_KEY_PREFIX: Final = f"{DOMAIN}.analytics"
+ANALYTICS_STORE_VERSION: Final = 1
+ANALYTICS_SAVE_DELAY: Final = 300.0
+"""Seconds between two writes of the counters while the entry runs."""
+ANALYTICS_TICK: Final = timedelta(seconds=60)
+"""Period of the derived-data timer while any unit runs."""
+
+# Identifier prefix of the house devices (derived data of one installation).
+HOUSE_DEVICE_PREFIX: Final = "house_"

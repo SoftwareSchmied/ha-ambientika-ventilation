@@ -14,6 +14,7 @@ from homeassistant.util import dt as dt_util
 from .const import (
     CLOUD_DEVICE_PREFIX,
     DOMAIN,
+    HOUSE_DEVICE_PREFIX,
     STALE_DEVICE_DISCOVERIES,
     STALE_DEVICE_MIN_AGE,
 )
@@ -24,13 +25,14 @@ LOGGER = logging.getLogger(__name__)
 def device_serials(device_entry: dr.DeviceEntry) -> set[str]:
     """Return the Ambientika serial numbers of a device registry entry.
 
-    The account-level cloud service device has no serial number and is never
-    treated as a unit.
+    The account-level cloud service device and the house devices have no serial
+    number and are never treated as units.
     """
     return {
         identifier
         for domain, identifier in device_entry.identifiers
-        if domain == DOMAIN and not identifier.startswith(CLOUD_DEVICE_PREFIX)
+        if domain == DOMAIN
+        and not identifier.startswith((CLOUD_DEVICE_PREFIX, HOUSE_DEVICE_PREFIX))
     }
 
 

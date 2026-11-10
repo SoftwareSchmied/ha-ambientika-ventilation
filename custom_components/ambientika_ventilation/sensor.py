@@ -26,6 +26,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from . import AmbientikaRuntimeData
+from .analytics_descriptions import DerivedDescription
+from .analytics_manager import AmbientikaAnalytics, DerivedTarget
 from .const import (
     AIR_QUALITY_LEVELS,
     API_TO_HA,
@@ -33,6 +35,7 @@ from .const import (
     REPORTED_OPERATING_MODES,
 )
 from .coordinator import AmbientikaCoordinator
+from .derived_entity import AmbientikaDerivedEntity
 from .entity import (
     AmbientikaCloudEntity,
     AmbientikaEntity,
@@ -397,6 +400,29 @@ CLOUD_SENSORS: tuple[AmbientikaCloudSensorDescription, ...] = (
 )
 
 
+def derived_sensor_description(derived: DerivedDescription) -> SensorEntityDescription:
+    """Return the Home Assistant description of a derived sensor."""
+    return SensorEntityDescription(
+        key=derived.key,
+        translation_key=derived.key,
+        device_class=(
+            SensorDeviceClass(derived.device_class) if derived.device_class else None
+        ),
+        native_unit_of_measurement=derived.unit,
+        state_class=(
+            SensorStateClass(derived.state_class) if derived.state_class else None
+        ),
+        entity_category=(
+            EntityCategory(derived.entity_category)
+            if derived.entity_category
+            else None
+        ),
+        entity_registry_enabled_default=derived.enabled_default,
+        suggested_display_precision=derived.precision,
+        options=list(derived.options) or None,
+    )
+
+
 def _enum_state(value: object, known: tuple[str, ...]) -> str | None:
     """Return the translated state of a known enum value, else unknown."""
     return API_TO_HA.get(value) if isinstance(value, str) and value in known else None
@@ -418,6 +444,7 @@ async def async_setup_entry(
     known_diagnostics: set[tuple[str, str]] = set()
     known_schedules: set[str] = set()
     known_hub: set[str] = set()
+    known_derived: set[str] = set()
     runtime = entry.runtime_data
     hub = runtime.hub
 
@@ -455,10 +482,17 @@ async def async_setup_entry(
             for serial in sorted(hub_serials)
             for description in HUB_SENSORS
         )
+        derived = [
+            target
+            for target in runtime.analytics.targets("sensor")
+            if target.unique_id not in known_derived
+        ]
+        entities.extend(AmbientikaDerivedSensor(runtime.analytics, t) for t in derived)
         if entities:
             async_add_entities(entities)
             known_devices.update(serials)
             known_hub.update(hub_serials)
+            known_derived.update(target.unique_id for target in derived)
 
     async_add_entities(
         AmbientikaCloudSensor(entry.entry_id, hub, description)
@@ -654,3 +688,20 @@ class AmbientikaCloudSensor(AmbientikaCloudEntity, SensorEntity):
         if self.entity_description.key != "cloud_last_failure_kind":
             return None
         return dict(self._hub.cloud_health.failures_by_kind) or None
+
+
+class AmbientikaDerivedSensor(AmbientikaDerivedEntity, SensorEntity):
+    """Sensor of one derived value (see ``analytics_descriptions``)."""
+
+    def __init__(self, analytics: AmbientikaAnalytics, target: DerivedTarget) -> None:
+        """Initialize the sensor from its derived description."""
+        super().__init__(analytics, target)
+        self.entity_description = derived_sensor_description(target.description)
+
+    @property
+    def native_value(self) -> Any:
+        """Return the last reported value; enum values outside the options are unknown."""
+        options = self._derived.options
+        if options and self._value not in options:
+            return None
+        return self._value

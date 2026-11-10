@@ -175,6 +175,8 @@ class Snapshot:
     """Optional ``LocalZoneState.reversals`` of the unit's zone."""
     zone: str | None = None
     """Zone key for zone totals."""
+    house: str | None = None
+    """House key for house totals (None: only the all-units total exists)."""
 
 
 def _text(value: Any) -> str | None:
@@ -199,7 +201,11 @@ def _number(value: Any) -> float | None:
 
 
 def snapshot_from_values(
-    values: Mapping[str, Any], *, zone: str | None = None, reversals: int | None = None
+    values: Mapping[str, Any],
+    *,
+    zone: str | None = None,
+    reversals: int | None = None,
+    house: str | None = None,
 ) -> Snapshot:
     """Build a :class:`Snapshot` from ``{key: ResolvedValue.value}``.
 
@@ -223,6 +229,7 @@ def snapshot_from_values(
         humidity_alarm=_flag(values.get("humidity_alarm")),
         reversals=reversals,
         zone=zone,
+        house=house,
     )
 
 
@@ -317,6 +324,7 @@ class _Command:
 @dataclass(slots=True)
 class _Device:
     zone: str | None = None
+    house: str | None = None
     # runtimes (seconds)
     operating_s: float = 0.0
     on_s: float = 0.0
@@ -488,6 +496,11 @@ class AnalyticsEngine:
         """Replace the model parameters (options changed); counters are kept."""
         self.config = config
 
+    @property
+    def serials(self) -> tuple[str, ...]:
+        """Return the units the engine holds counters for."""
+        return tuple(self._devices)
+
     def forget(self, serial: str) -> None:
         """Drop a unit's live state and counters (device removed)."""
         self._devices.pop(serial, None)
@@ -508,6 +521,7 @@ class AnalyticsEngine:
         """
         dev = self._devices.setdefault(serial, _Device())
         dev.zone = snapshot.zone
+        dev.house = snapshot.house
         self._expire(dev, now)
         self._roll_day(dev, wall)
         self._credit(dev, now)
@@ -536,15 +550,26 @@ class AnalyticsEngine:
         return self._finish(f"zone:{zone}", "zone", self._totals("zone", devices), now)
 
     def house_values(
-        self, now: float, outdoor: OutdoorConditions | None = None
+        self,
+        now: float,
+        outdoor: OutdoorConditions | None = None,
+        house: str | None = None,
     ) -> Derived:
-        """Return the house totals plus the outdoor derivations."""
-        raw = self._totals("house", list(self._devices.values()))
+        """Return the house totals plus the outdoor derivations.
+
+        ``house`` limits the totals to the units of that house; without it all
+        units count (accounts with a single house).
+        """
+        devices = [
+            d for d in self._devices.values() if house is None or d.house == house
+        ]
+        raw = self._totals("house", devices)
         raw["outdoor_dew_point"] = outdoor.dew_point if outdoor else None
         raw["outdoor_absolute_humidity"] = (
             outdoor.absolute_humidity if outdoor else None
         )
-        return self._finish("house", "house", raw, now)
+        scope_id = "house" if house is None else f"house:{house}"
+        return self._finish(scope_id, "house", raw, now)
 
     def reset_filter(self, serial: str, wall: datetime) -> None:
         """Mark the filter as replaced/cleaned now (own reset button)."""

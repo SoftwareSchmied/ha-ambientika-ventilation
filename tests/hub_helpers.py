@@ -159,6 +159,10 @@ def runtime(coordinator, hub: AmbientikaHub | None = None):
 
     local_manager = MagicMock()
     local_manager.diagnostics.return_value = {"mode": "auto"}
+    local_manager.mode = "auto"
+    analytics = MagicMock()
+    analytics.targets.return_value = []
+    analytics.diagnostics.return_value = {"units": 0}
     if hub is None:
         hub = AmbientikaHub()
         if isinstance(getattr(coordinator, "data", None), AmbientikaData):
@@ -167,6 +171,7 @@ def runtime(coordinator, hub: AmbientikaHub | None = None):
         coordinator=coordinator,
         hub=hub,
         local=local_manager,
+        analytics=analytics,
         raw_variants=False,
     )
 

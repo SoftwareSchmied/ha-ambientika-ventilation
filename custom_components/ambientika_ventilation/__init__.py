@@ -40,6 +40,7 @@ from .const import (
     TOKEN_CHECK_INTERVAL,
     TOKEN_RENEW_BEFORE,
 )
+from .analytics_manager import AmbientikaAnalytics, make_analytics_store
 from .coordinator import AmbientikaCoordinator
 from .datapoints import variant_keys
 from .hub import EVALUATE_INTERVAL_S, AmbientikaHub
@@ -72,6 +73,7 @@ class AmbientikaRuntimeData:
     coordinator: AmbientikaCoordinator
     hub: AmbientikaHub
     local: AmbientikaLocal
+    analytics: AmbientikaAnalytics
     raw_variants: bool = False
 
 
@@ -129,6 +131,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: AmbientikaConfigEntry) -
     local = AmbientikaLocal(hass, entry, coordinator, hub, make_store(hass, entry))
     await local.async_load()
     entry.async_on_unload(local.attach())
+    analytics = AmbientikaAnalytics(
+        hass, entry, coordinator, hub, local, make_analytics_store(hass, entry)
+    )
+    await analytics.async_load()
     await coordinator.async_config_entry_first_refresh()
     raw_variants = bool(entry.options.get(CONF_RAW_VARIANTS, DEFAULT_RAW_VARIANTS))
     entry.runtime_data = AmbientikaRuntimeData(
@@ -136,8 +142,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: AmbientikaConfigEntry) -
         coordinator=coordinator,
         hub=hub,
         local=local,
+        analytics=analytics,
         raw_variants=raw_variants,
     )
+    coordinator.command_observer = analytics
+    entry.async_on_unload(analytics.attach())
+    analytics.refresh()
+    entry.async_on_unload(analytics.async_stop)
 
     @callback
     def evaluate_hub(_now: datetime) -> None:
@@ -210,8 +221,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: AmbientikaConfigEntry) 
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: AmbientikaConfigEntry) -> None:
-    """Delete the cached topology and probe result of a removed entry."""
+    """Delete the cached topology, probe result and counters of a removed entry."""
     await make_store(hass, entry).async_remove()
+    await make_analytics_store(hass, entry).async_remove()
 
 
 async def async_remove_config_entry_device(

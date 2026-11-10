@@ -17,7 +17,10 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import AmbientikaRuntimeData
+from .analytics_descriptions import DerivedDescription
+from .analytics_manager import AmbientikaAnalytics, DerivedTarget
 from .coordinator import AmbientikaCoordinator
+from .derived_entity import AmbientikaDerivedEntity
 from .entity import (
     AmbientikaCloudEntity,
     AmbientikaEntity,
@@ -97,6 +100,27 @@ BINARY_SENSORS = (
 )
 
 
+def derived_binary_description(
+    derived: DerivedDescription,
+) -> BinarySensorEntityDescription:
+    """Return the Home Assistant description of a derived binary sensor."""
+    return BinarySensorEntityDescription(
+        key=derived.key,
+        translation_key=derived.key,
+        device_class=(
+            BinarySensorDeviceClass(derived.device_class)
+            if derived.device_class
+            else None
+        ),
+        entity_category=(
+            EntityCategory(derived.entity_category)
+            if derived.entity_category
+            else None
+        ),
+        entity_registry_enabled_default=derived.enabled_default,
+    )
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry[AmbientikaRuntimeData],
@@ -107,6 +131,7 @@ async def async_setup_entry(
     known: set[str] = set()
     known_connection: set[str] = set()
     known_hub: set[str] = set()
+    known_derived: set[str] = set()
     runtime = entry.runtime_data
     hub = runtime.hub
 
@@ -139,8 +164,17 @@ async def async_setup_entry(
             for serial in sorted(hub_serials)
             for description in HUB_BINARY_SENSORS
         )
+        derived = [
+            target
+            for target in runtime.analytics.targets("binary_sensor")
+            if target.unique_id not in known_derived
+        ]
+        entities.extend(
+            AmbientikaDerivedBinarySensor(runtime.analytics, t) for t in derived
+        )
         if entities:
             async_add_entities(entities)
+            known_derived.update(target.unique_id for target in derived)
             known.update(serials)
             known_connection.update(connection_serials)
             known_hub.update(hub_serials)
@@ -245,3 +279,17 @@ class AmbientikaCloudReachable(AmbientikaCloudEntity, BinarySensorEntity):
     def is_on(self) -> bool:
         """Return whether the cloud is reachable."""
         return self._hub.cloud_reachable()
+
+
+class AmbientikaDerivedBinarySensor(AmbientikaDerivedEntity, BinarySensorEntity):
+    """Binary sensor of one derived condition (see ``analytics_descriptions``)."""
+
+    def __init__(self, analytics: AmbientikaAnalytics, target: DerivedTarget) -> None:
+        """Initialize the binary sensor from its derived description."""
+        super().__init__(analytics, target)
+        self.entity_description = derived_binary_description(target.description)
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return the last reported condition."""
+        return self._value if isinstance(self._value, bool) else None

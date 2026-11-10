@@ -13,11 +13,11 @@ from homeassistant.helpers.entity import Entity, EntityDescription
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CLOUD_DEVICE_PREFIX, DOMAIN, THROTTLE_INTERVAL
+from .const import CLOUD_DEVICE_PREFIX, DOMAIN, HOUSE_DEVICE_PREFIX, THROTTLE_INTERVAL
 from .coordinator import AmbientikaCoordinator, firmware_text
 from .datapoints import Source, variant_keys
 from .hub import AmbientikaHub, CloudHealth, ResolvedValue
-from .models import AmbientikaDeviceData, AmbientikaStatus
+from .models import AmbientikaDevice, AmbientikaDeviceData, AmbientikaStatus
 
 
 class AmbientikaEntity(CoordinatorEntity[AmbientikaCoordinator]):
@@ -63,24 +63,37 @@ class AmbientikaEntity(CoordinatorEntity[AmbientikaCoordinator]):
     @property
     def device_info(self) -> DeviceInfo:
         """Return Home Assistant device registry metadata."""
-        device = self.device_data.device
-        model = device.device_type or "Ambientika ventilation unit"
-        if device.device_subtype and device.device_subtype != "None":
-            model = f"{model} {device.device_subtype}"
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._serial)},
-            manufacturer="Südwind",
-            name=device.name,
-            model=model,
-            hw_version=(
-                device.device_subtype
-                if device.device_subtype not in (None, "None")
-                else None
-            ),
-            serial_number=self._serial,
-            suggested_area=device.room_name,
-            sw_version=firmware_text(device),
-        )
+        return unit_device_info(self._serial, self.device_data.device)
+
+
+def unit_device_info(serial: str, device: AmbientikaDevice) -> DeviceInfo:
+    """Return the registry metadata of one unit (also used by derived entities)."""
+    model = device.device_type or "Ambientika ventilation unit"
+    if device.device_subtype and device.device_subtype != "None":
+        model = f"{model} {device.device_subtype}"
+    return DeviceInfo(
+        identifiers={(DOMAIN, serial)},
+        manufacturer="Südwind",
+        name=device.name,
+        model=model,
+        hw_version=(
+            device.device_subtype if device.device_subtype not in (None, "None") else None
+        ),
+        serial_number=serial,
+        suggested_area=device.room_name,
+        sw_version=firmware_text(device),
+    )
+
+
+def house_device_info(house_id: int, name: str | None) -> DeviceInfo:
+    """Return the registry metadata of the device that carries house-level data."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{HOUSE_DEVICE_PREFIX}{house_id}")},
+        name=name or "Ambientika house",
+        manufacturer="Südwind",
+        model="House",
+        entry_type=DeviceEntryType.SERVICE,
+    )
 
 
 # --- Hub-backed entities ----------------------------------------------------

@@ -6,10 +6,10 @@ import asyncio
 import logging
 import time
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Protocol
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
@@ -154,6 +154,22 @@ def firmware_text(device: AmbientikaDevice) -> str | None:
     return " / ".join(part for part in parts if part) or None
 
 
+class CommandObserver(Protocol):
+    """Receives the outcome of commands (statistics of the derived data)."""
+
+    def command_sent(self, serial: str, expected: Mapping[str, str]) -> int:
+        """A command is about to be sent; return a token for the outcome."""
+
+    def command_confirmed(self, serial: str, token: int) -> None:
+        """The read-back shows the written values."""
+
+    def command_rejected(self, serial: str, token: int) -> None:
+        """The command failed."""
+
+    def filter_reset(self, serial: str) -> None:
+        """The cloud accepted a filter reset."""
+
+
 @dataclass(slots=True)
 class _PendingWrite:
     """Commands for one device that are collected before they are sent."""
@@ -228,6 +244,8 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         self._topology_listener_id = 0
         self.hub: AmbientikaHub | None = None
         """Hybrid data hub, set by the setup before the first refresh."""
+        self.command_observer: CommandObserver | None = None
+        """Derived-data statistics of commands, set by the setup."""
         self._last_success_mono: float | None = None
         self._last_failure_mono: float | None = None
         self._last_change_mono: float | None = None
@@ -1133,6 +1151,10 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             plan = self._plan_write(serial, fields)
             if self.hub is not None:
                 self.hub.set_expected(serial, plan.expected, ttl=EXPECTED_COMMAND_TTL)
+            observer = self.command_observer
+            token = None if observer is None else observer.command_sent(
+                serial, plan.expected
+            )
             try:
                 await self.api.async_change_mode(
                     serial,
@@ -1140,10 +1162,12 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
                     schedule_mode=plan.schedule_mode,
                 )
             except AmbientikaAuthError as err:
+                self._command_rejected(serial, token)
                 self._clear_expected(serial, plan.expected)
                 self.config_entry.async_start_reauth(self.hass)
                 raise action_error("auth_failed") from err
             except AmbientikaDeviceOfflineError as err:
+                self._command_rejected(serial, token)
                 self._clear_expected(serial, plan.expected)
                 LOGGER.debug(
                     "Ambientika device %s did not respond: %s",
@@ -1152,6 +1176,7 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
                 )
                 raise action_error("device_offline") from err
             except (AmbientikaApiError, ValueError) as err:
+                self._command_rejected(serial, token)
                 self._clear_expected(serial, plan.expected)
                 LOGGER.debug(
                     "Ambientika command for %s failed: %s",
@@ -1173,6 +1198,8 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             )
 
         latest, matched = await self._async_read_back(serial, matches)
+        if matched and token is not None and self.command_observer is not None:
+            self.command_observer.command_confirmed(serial, token)
         if self._generation.get(serial, 0) != generation:
             LOGGER.debug(
                 "Ambientika read-back for %s dropped: a newer command was sent",
@@ -1190,6 +1217,11 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             refreshed = _with_expected(latest or plan.status, plan.expected)
         self._remember_writable(serial, refreshed)
         self._apply_status(serial, refreshed)
+
+    def _command_rejected(self, serial: str, token: int | None) -> None:
+        """Tell the command statistics that a command failed."""
+        if token is not None and self.command_observer is not None:
+            self.command_observer.command_rejected(serial, token)
 
     def _clear_expected(self, serial: str, expected: dict[str, str]) -> None:
         """Forget the pending values of a command that was not accepted."""
@@ -1256,6 +1288,8 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
                 )
                 raise action_error("filter_reset_failed") from err
             generation = self._mark_command(serial)
+            if self.command_observer is not None:
+                self.command_observer.filter_reset(serial)
 
         latest, matched = await self._async_read_back(
             serial, lambda candidate: candidate.filter_status not in (None, "Bad")

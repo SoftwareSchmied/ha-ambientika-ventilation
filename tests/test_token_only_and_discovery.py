@@ -126,7 +126,7 @@ async def test_failed_renewal_starts_reauthentication(hass, caplog) -> None:
     coordinator = MagicMock()
     coordinator.async_config_entry_first_refresh = AsyncMock()
     coordinator.base_interval = timedelta(seconds=60)
-    coordinator.data = None
+    coordinator.data = MagicMock(devices={})
     session = MagicMock()
     session.close = AsyncMock()
 
