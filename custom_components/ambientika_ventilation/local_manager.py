@@ -290,12 +290,31 @@ class AmbientikaLocal:
 
     @staticmethod
     async def _probe_house(house: int, zones: set[int]) -> bool:
+        reports: list[dict[str, Any]] = []
         try:
-            frames = await probe(house, sorted(zones), PROBE_DURATION, min_frames=1)
+            frames = await probe(
+                house,
+                sorted(zones),
+                PROBE_DURATION,
+                min_frames=1,
+                report=reports.append,
+            )
         except OSError as err:
-            _LOGGER.debug("Local UDP probe could not bind: %s", err)
+            _LOGGER.info("Local UDP probe could not bind: %s", err)
             return False
-        return any(frames.values())
+        heard = any(frames.values())
+        if not heard:
+            report = reports[0] if reports else {}
+            _LOGGER.info(
+                "Local UDP probe heard no broadcasts of this account in %.0f s "
+                "(zones %s, bound ports %s, bind errors %s, rejected frames %s)",
+                PROBE_DURATION,
+                sorted(zones),
+                report.get("bound_ports"),
+                report.get("bind_errors") or {},
+                report.get("rejects") or {},
+            )
+        return heard
 
     # ----------------------------------------------------------------- issues
 

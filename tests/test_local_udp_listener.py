@@ -261,6 +261,7 @@ async def test_probe_collects_frames() -> None:
             sender.send(make(0, house=3), base)
 
         task = asyncio.create_task(send_later())
+        reports: list[dict] = []
         seen = await probe(
             HOUSE,
             [0, 1],
@@ -268,9 +269,13 @@ async def test_probe_collects_frames() -> None:
             base_port=base,
             source_base_port=sender.port,
             bind_host="127.0.0.1",
+            report=reports.append,
         )
         await task
     assert [f.state_raw for f in seen[0]] == [0x25, 0x29]
+    (report,) = reports
+    assert sorted(report["bound_ports"]) == [base, base + 1]
+    assert report["rejects"] == {"house_id": 1}
     assert seen[1] == []
     assert isinstance(seen[0][0], UdpFrame)
 

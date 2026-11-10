@@ -228,12 +228,15 @@ async def probe(
     base_port: int = UDP_BASE_PORT,
     source_base_port: int | None = UDP_SOURCE_BASE_PORT,
     bind_host: str = "0.0.0.0",
+    report: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[int, list[UdpFrame]]:
     """Listen for ``duration`` seconds and return accepted frames per zone.
 
     With ``min_frames`` the probe ends early once every bound zone has seen that
     many frames. Zones whose port cannot be bound are skipped; if none can be
-    bound the ``UdpBindError`` is raised.
+    bound the ``UdpBindError`` is raised. ``report`` receives the listener
+    diagnostics (bound ports, bind errors, rejected frames per reason) before
+    the sockets close.
     """
     wanted = sorted(set(zones))
     seen: dict[int, list[UdpFrame]] = {zone: [] for zone in wanted}
@@ -265,6 +268,8 @@ async def probe(
             bound_zones = {z for z in wanted if base_port + z not in err.errors}
         with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(done.wait(), duration)
+        if report is not None:
+            report(listener.diagnostics())
     finally:
         await listener.stop()
     return seen

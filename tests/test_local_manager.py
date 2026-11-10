@@ -184,7 +184,8 @@ async def test_auto_mode_enables_the_listener_after_a_successful_probe(
         assert probe.await_args.args[0] == HOUSE
         assert probe.await_args.args[1] == [1]
         assert probe.await_args.args[2] == 60.0
-        assert probe.await_args.kwargs == {"min_frames": 1}
+        assert probe.await_args.kwargs["min_frames"] == 1
+        assert callable(probe.await_args.kwargs["report"])
         assert manager.probe_state == PROBE_DETECTED
         (listener,) = FakeListener.instances
         listener.on_state(local(clock, n=1), False)
@@ -197,7 +198,7 @@ async def test_auto_mode_enables_the_listener_after_a_successful_probe(
 
 
 async def test_auto_mode_stays_cloud_only_when_nothing_is_heard(
-    hass, hass_storage
+    hass, hass_storage, caplog
 ) -> None:
     """No frames: no listener, and the next start probes again."""
     with fake_listeners(probe_result={1: []}) as probe:
@@ -206,6 +207,7 @@ async def test_auto_mode_stays_cloud_only_when_nothing_is_heard(
         await hass.async_block_till_done(wait_background_tasks=True)
         assert manager.probe_state == PROBE_NOTHING
         assert FakeListener.instances == []
+        assert "heard no broadcasts" in caplog.text
         await manager.async_stop()
         key = f"{DOMAIN}.{entry.entry_id}"
         assert hass_storage[key]["data"]["probe"]["detected"] is False
