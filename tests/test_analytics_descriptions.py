@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from custom_components.ambientika_ventilation import const
 from custom_components.ambientika_ventilation.analytics_descriptions import (
     AIR_QUALITY_INDEX,

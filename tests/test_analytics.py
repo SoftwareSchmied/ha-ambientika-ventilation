@@ -9,7 +9,6 @@ from enum import StrEnum
 from typing import Any
 
 import pytest
-
 from custom_components.ambientika_ventilation.analytics import (
     SNAPSHOT_KEYS,
     AnalyticsConfig,

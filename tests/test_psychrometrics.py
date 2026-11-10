@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from custom_components.ambientika_ventilation import psychrometrics as psy
 
 

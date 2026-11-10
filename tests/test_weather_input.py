@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-
 from custom_components.ambientika_ventilation.weather_input import (
     OutdoorConditions,
     WeatherInput,
