@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -53,6 +52,8 @@ from homeassistant.components.fan import FanEntityFeature
 from homeassistant.components.sensor import SensorStateClass
 from homeassistant.exceptions import ServiceValidationError
 
+from .hub_helpers import fake_entry
+
 SERIAL = "AABBCCDDEEFF"
 
 
@@ -87,7 +88,7 @@ def coordinator_with_status():
             )
         }
     )
-    coordinator.async_add_listener = MagicMock(return_value=MagicMock())
+    coordinator.async_add_topology_listener = MagicMock(return_value=MagicMock())
     coordinator.async_write_state = AsyncMock()
     coordinator.async_reset_filter = AsyncMock()
     return coordinator
@@ -222,7 +223,10 @@ def test_device_metadata_sensor_normalizes_role() -> None:
 
 
 def test_house_sensor_exposes_complete_topology_metadata() -> None:
-    """House details are grouped as disabled diagnostic attributes."""
+    """House details are grouped as disabled diagnostic attributes.
+
+    Address, coordinates and the house identifier are never attributes.
+    """
     coordinator = coordinator_with_status()
     coordinator.data.devices[SERIAL] = replace(
         coordinator.data.devices[SERIAL],
@@ -243,10 +247,6 @@ def test_house_sensor_exposes_complete_topology_metadata() -> None:
 
     assert entity.native_value == "Home"
     assert entity.extra_state_attributes == {
-        "house_id": 10,
-        "address": "Test street 1",
-        "latitude": 50.1,
-        "longitude": 8.4,
         "timezone": 2,
         "iana_timezone": "Europe/Berlin",
         "devices_count": 2,
@@ -431,10 +431,7 @@ def test_schedule_sensor_and_missing_sensor_values() -> None:
 async def test_all_platform_setup_callbacks(hass) -> None:
     """Every platform creates only the entities supported by current data."""
     coordinator = coordinator_with_status()
-    entry = SimpleNamespace(
-        runtime_data=SimpleNamespace(coordinator=coordinator),
-        async_on_unload=MagicMock(),
-    )
+    entry = fake_entry(coordinator)
     setup_functions = (
         async_setup_binary_sensors,
         async_setup_buttons,
@@ -450,7 +447,7 @@ async def test_all_platform_setup_callbacks(hass) -> None:
         await setup(hass, entry, added.extend)
         counts.append(len(added))
 
-    assert counts == [4, 1, 1, 3, 9, 1]
+    assert counts == [12, 1, 1, 3, 22, 1]
     assert entry.async_on_unload.call_count == len(setup_functions)
 
 

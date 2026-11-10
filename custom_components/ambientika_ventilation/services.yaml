@@ -1,0 +1,142 @@
+set_state:
+  target:
+    entity:
+      integration: ambientika_ventilation
+      domain: fan
+  fields:
+    operating_mode:
+      selector:
+        select:
+          options:
+            - smart
+            - auto
+            - heat_recovery
+            - night
+            - away
+            - surveillance
+            - timed_extraction
+            - extraction
+            - intake
+            - master_slave_flow
+            - slave_master_flow
+            - "off"
+    fan_speed:
+      selector:
+        select:
+          options:
+            - low
+            - medium
+            - high
+            - turbo
+    humidity_level:
+      selector:
+        select:
+          options:
+            - dry
+            - normal
+            - moist
+    light_sensor_level:
+      selector:
+        select:
+          options:
+            - "off"
+            - low
+            - medium
+
+set_time_slot:
+  target:
+    entity:
+      integration: ambientika_ventilation
+      domain: calendar
+  fields:
+    slot_id:
+      selector:
+        number:
+          min: 1
+          mode: box
+    day:
+      selector:
+        select:
+          options:
+            - monday
+            - tuesday
+            - wednesday
+            - thursday
+            - friday
+            - saturday
+            - sunday
+    start:
+      selector:
+        time:
+    end:
+      selector:
+        time:
+    operating_mode:
+      selector:
+        select:
+          options:
+            - smart
+            - auto
+            - heat_recovery
+            - night
+            - away
+            - surveillance
+            - timed_extraction
+            - extraction
+            - intake
+            - master_slave_flow
+            - slave_master_flow
+            - "off"
+    fan_speed:
+      selector:
+        select:
+          options:
+            - low
+            - medium
+            - high
+            - turbo
+    humidity_level:
+      selector:
+        select:
+          options:
+            - dry
+            - normal
+            - moist
+    light_sensor_level:
+      selector:
+        select:
+          options:
+            - "off"
+            - low
+            - medium
+
+delete_time_slot:
+  target:
+    entity:
+      integration: ambientika_ventilation
+      domain: calendar
+  fields:
+    slot_id:
+      required: true
+      selector:
+        number:
+          min: 1
+          mode: box
+
+clear_schedule:
+  target:
+    entity:
+      integration: ambientika_ventilation
+      domain: calendar
+  fields:
+    confirm:
+      required: true
+      default: false
+      selector:
+        boolean:
+
+get_schedule:
+  target:
+    entity:
+      integration: ambientika_ventilation
+      domain: calendar

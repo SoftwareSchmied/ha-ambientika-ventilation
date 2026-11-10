@@ -530,7 +530,7 @@ async def test_partial_failure_warning_names_the_cause(
 async def test_real_client_outage_profile_bounds_http_requests(
     hass, houses_payload
 ) -> None:
-    """With the cloud returning 503, one cycle sends at most six HTTP requests."""
+    """With the cloud returning 503, a poll cycle sends two requests."""
     session = MagicMock(spec=ClientSession)
     session.request = AsyncMock(return_value=FakeResponse(503))
     client = AmbientikaApiClient(
@@ -559,13 +559,16 @@ async def test_real_client_outage_profile_bounds_http_requests(
         call.args[1].removeprefix("https://ambientika.test")
         for call in (session.request.await_args_list)
     ]
-    # Discovery: 3 attempts once (then backed off). Each cycle: house batch
-    # (3 attempts) plus one probing device read (3 attempts).
+    # Discovery: 3 attempts once (then backed off). Each cycle: one house
+    # batch request plus one probing device read, both with a single attempt.
     assert paths.count("/House/houses-info") == 3
-    assert paths.count("/Device/house-devices-status") == 9
-    assert paths.count("/Device/device-status") == 9
-    assert len(paths) == 21
-    assert client.metrics.error_kinds == {"http_5xx": 21}
+    assert paths.count("/Device/house-devices-status") == 3
+    assert paths.count("/Device/device-status") == 3
+    assert len(paths) == 9
+    assert client.metrics.error_kinds == {"http_5xx": 9}
+    # Failed cycles stretch the polling interval up to ten minutes.
+    assert coordinator.consecutive_failures == 3
+    assert coordinator.update_interval == timedelta(minutes=8)
 
 
 async def test_batch_auth_failure_requires_reauth(hass, houses_payload) -> None:

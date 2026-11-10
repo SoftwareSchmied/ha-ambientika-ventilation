@@ -6,6 +6,167 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0-beta.1] - 2026-11-10
+
+First beta of 1.0. It combines the cloud integration with the local UDP
+broadcasts of the units. It also adds about 100 derived values, schedules as a
+calendar, and a large robustness and efficiency overhaul. Existing entity IDs,
+history and automations are kept. Tested on Home Assistant 2026.11.1 with two
+Ghost masters in separate zones. The minimum Home Assistant version is now
+2026.9.0.
+
+### Local data (UDP) and hybrid model
+
+- Passive reception of the UDP broadcasts of the zone masters (ports 45000 and
+  up; nothing is sent). They carry the physical state, which is the zone
+  coupling, airflow direction and fan stage. They arrive every 27 s and
+  immediately on every change.
+- New option "Local UDP reception" with the values automatic, on and off.
+  Automatic is the default: it listens for up to 60 s in the background after
+  setup and remembers the result.
+- Hybrid model: values available from both sources (power, running, last seen)
+  get an effective entity that prefers the local value while it is fresh. They
+  also get `(Cloud)` and `(local)` variants, which are disabled unless the
+  option "Create raw source variants" is on. Controls and selects keep
+  following the cloud setting.
+- New entities per unit:
+  - power, running, physical direction, physical fan stage and zone coupling
+  - last seen, both effective and local
+  - data source (`local_udp`, `cloud`, `degraded`, `offline`)
+  - heartbeat age (disabled)
+
+  A new "Ambientika cloud" device shows reachability and request health.
+- Commands are confirmed locally about 6 s after they are sent. A change
+  detected over UDP asks the cloud for confirmation at most every 30 s.
+- Frames are checked for length, header, zone, ports, house id, sender and
+  rate. Local data is informative only and never bypasses locks.
+- Repair issues explain bind failures and missing frames in mode "on". The
+  diagnostics show the result of the last automatic probe: bound ports, frames
+  heard and rejected frames.
+
+### Network requirements for local data
+
+- Home Assistant must be in the same network (layer 2 segment or VLAN) as the
+  units. Routers never forward broadcasts, and firewall rules between VLANs do
+  not change that.
+- Home Assistant OS and Supervised work directly when they share the network
+  with the units. Docker needs `network_mode: host`.
+- Units in an IoT VLAN need one of the following:
+  - an interface for Home Assistant in that VLAN; on Home Assistant OS use
+    `ha network vlan <interface> <id>` with a static address and no gateway
+    (see the README)
+  - a second virtual network card with the VLAN tag in the hypervisor
+
+  Without local frames, everything keeps working with the cloud.
+
+### Derived data
+
+- About 100 derived sensors per unit, zone and house. Most are disabled by
+  default. They cover:
+  - runtimes per mode, stage and direction, reversals and heat-recovery cycles
+  - airflow, moved air volume and the air change rate (needs a room volume)
+  - estimated power and energy
+  - recovered heat and ventilation heat loss (needs an outdoor source)
+  - dew point, absolute humidity, distance to the humidity setpoint, comfort
+    class and a numeric air quality
+  - filter hours, remaining hours and the predicted alarm date
+  - visible automatic actions: humidity exhaust, night reduction, timed
+    extraction, Smart behaviour and free cooling
+  - measurement validity with the last valid room values
+  - alarm durations and command statistics
+  - zone and house totals
+- New options: an outdoor weather entity or outdoor temperature and humidity
+  sensors (°C, °F, K), the filter hours basis, and the room volume per unit.
+- Estimates are marked as such, and counters survive restarts. Formulas and
+  sources are documented in `docs/DERIVED_DATA.md`.
+- While a unit stands still it measures the air in the wall duct. Climate
+  values derived from these readings use the last valid reading instead.
+
+### Schedules
+
+- Weekly schedules appear as a calendar for each unit that has a schedule, in
+  the house time zone. Events can be created, changed and deleted when the
+  account has the weekly scheduler feature.
+- New actions `set_time_slot`, `delete_time_slot`, `clear_schedule` (needs
+  `confirm: true`) and `get_schedule` (response only). Values and overlaps are
+  checked before anything is sent.
+- The write endpoints come from the official app. They are not yet verified
+  against a unit with an active schedule.
+
+### Cloud robustness and efficiency
+
+- A dedicated connection pool with 120 s keep-alive replaces the new TLS
+  handshake on every poll.
+- Poll interval:
+  - a new option, 30 to 600 s (default 60 s)
+  - 30 s for three minutes after a command
+  - growing to ten minutes while the cloud is unreachable
+- Polls make a single attempt, requests time out after 10 s, and commands have
+  their own request lane.
+- Commands for one unit that arrive together are merged into one request. The
+  new action `set_state` sets the mode, fan speed, humidity target and light
+  sensitivity at once.
+- A poll that started before a command no longer overwrites it. Confirmed
+  read-backs reach the hub immediately.
+- Entities update only when data changes. Names, roles and firmware are read
+  from every status response, and the diagnostics keep a firmware history.
+- Schedules are requested only for units that report one.
+- The login token is renewed when fewer than 30 days remain. A failed renewal
+  keeps the token that is still valid.
+- Units rejected with HTTP 403 or 404 are retried after 1, 2, 5 and 15 minutes
+  before they count as unsupported. An empty discovery no longer removes all
+  devices. There is a new binary sensor "Cloud connection" per unit.
+- Turbo respects the `turboMode` feature flag. Unknown enum values show as
+  unknown with a `raw_value` attribute.
+
+### Quality and privacy
+
+- Stale devices are removed after four successful discoveries without them,
+  and only once at least 24 hours have passed. Devices the cloud no longer
+  reports can also be removed manually.
+- DHCP discovery for the hostnames `VMC_*` and `GMN_*`.
+- New option "Do not store the password": only the 180-day token is stored and
+  renewed. If renewal fails, reauthentication starts.
+- The house sensor no longer has address, coordinates, time zone and house
+  time attributes. These values are now separate diagnostic sensors on a new
+  house device, disabled by default. No entity attribute exposes serials,
+  house ids or locations.
+- New `quality_scale.yaml`, icon translations, translated exceptions,
+  parallel update limits, and extended diagnostics with masked serials.
+- Test coverage is enforced at 98 %. CI runs with Python 3.14.7, plus a
+  non-blocking job against the newest Home Assistant release.
+
+### Fixed during the beta test
+
+- Entity actions are now registered with field dictionaries. Home Assistant
+  2026.11 rejected the previous schema and did not load the integration.
+- No fan stage, airflow or power is reported while the fan stands still, both
+  after a command (about 45 s) and during the ~10 s reversal.
+- The "no frames" repair issue is no longer reset by internal freshness
+  reports.
+- A new sender address is accepted after about 81 s instead of five minutes.
+
+### Known limitations
+
+- Setup still needs one successful cloud poll. Starting from the cached
+  topology while the cloud is down is planned for a later release.
+- Temperature, humidity, air quality and filter state come only from the cloud,
+  because the UDP broadcast does not carry them.
+
+### Maintenance
+
+- The test stack is updated to Home Assistant 2026.10.4 with
+  pytest-homeassistant-custom-component 0.13.375.
+- Ruff is updated to 0.17.4 and Mypy to 2.4.1, and the GitHub Actions
+  setup-python, hassfest and CodeQL are updated, all from Dependabot #18, #20
+  and #22.
+- Home Assistant 2026.11.0, pytest 9.2.0 and pytest-asyncio 1.4.1 from #22 are
+  not used, because the newest test plugin pins Home Assistant 2026.10.4,
+  pytest 9.0.3 and pytest-asyncio 1.4.0.
+- The Mypy configuration treats `voluptuous`, which is an alias of `probatio`
+  inside Home Assistant, as untyped, and allows the platform re-exports of
+  Home Assistant.
+
 ## [0.9.3] - 2026-11-10
 
 - Fix commands failing while a unit reports the automatic `Night` fan speed,
@@ -107,7 +268,9 @@ All notable changes to this project are documented here. The format follows
 - Add reproducible release archives, HACS/hassfest validation, security checks,
   repository templates, and complete release documentation.
 
-[Unreleased]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v1.0.0-beta.1...HEAD
+[1.0.0-beta.1]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.3...v1.0.0-beta.1
+[0.9.3]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.1...v0.9.2
 [0.9.2-beta.1]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.1...v0.9.2-beta.1
 [0.9.1]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.0...v0.9.1

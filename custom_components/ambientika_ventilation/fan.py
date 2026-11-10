@@ -5,23 +5,45 @@ from __future__ import annotations
 import math
 from typing import Any
 
+import voluptuous as vol
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import AmbientikaRuntimeData
 from .const import (
+    API_TO_HA,
+    HUMIDITY_LEVELS,
+    LIGHT_SENSOR_LEVELS,
+    OPERATING_MODES,
     USER_OPERATING_MODES,
     WRITABLE_FAN_SPEEDS,
     mode_allows_setting,
     operating_modes_for_device,
 )
+from .coordinator import AmbientikaCoordinator
 from .entity import AmbientikaEntity
 from .errors import validation_error
-from .models import is_controllable_device
+from .models import is_controllable_device, turbo_usable
 
 PARALLEL_UPDATES = 1
+
+SERVICE_SET_STATE = "set_state"
+# Fields of the set_state action: Home Assistant option names and API values.
+STATE_FIELDS: dict[str, tuple[str, ...]] = {
+    "operating_mode": OPERATING_MODES,
+    "fan_speed": WRITABLE_FAN_SPEEDS,
+    "humidity_level": HUMIDITY_LEVELS,
+    "light_sensor_level": LIGHT_SENSOR_LEVELS[1:],
+}
+SET_STATE_SCHEMA = vol.Schema(
+    {
+        vol.Optional(field): vol.In([API_TO_HA[value] for value in values])
+        for field, values in STATE_FIELDS.items()
+    }
+)
 
 
 async def async_setup_entry(
@@ -45,8 +67,13 @@ async def async_setup_entry(
             async_add_entities(AmbientikaFan(coordinator, serial) for serial in serials)
             known.update(serials)
 
+    platform = entity_platform.async_get_current_platform()
+    platform.async_register_entity_service(
+        SERVICE_SET_STATE, SET_STATE_SCHEMA.schema, "async_set_state"
+    )
+
     add_new_entities()
-    entry.async_on_unload(coordinator.async_add_listener(add_new_entities))
+    entry.async_on_unload(coordinator.async_add_topology_listener(add_new_entities))
 
 
 class AmbientikaFan(AmbientikaEntity, FanEntity):
@@ -54,7 +81,7 @@ class AmbientikaFan(AmbientikaEntity, FanEntity):
 
     _attr_translation_key = "ventilation"
 
-    def __init__(self, coordinator: Any, serial: str) -> None:
+    def __init__(self, coordinator: AmbientikaCoordinator, serial: str) -> None:
         """Initialize an Ambientika fan entity."""
         super().__init__(coordinator, serial, "ventilation")
         self._attr_preset_modes = ["night"]
@@ -107,7 +134,7 @@ class AmbientikaFan(AmbientikaEntity, FanEntity):
     def _writable_speeds(self) -> tuple[str, ...]:
         """Return speeds supported by this status packet."""
         speeds: tuple[str, ...] = WRITABLE_FAN_SPEEDS[:3]
-        if self.status is not None and self.status.turbo_available:
+        if turbo_usable(self.status, self.coordinator.data.feature_flags):
             speeds += ("Turbo",)
         return speeds
 
@@ -150,6 +177,33 @@ class AmbientikaFan(AmbientikaEntity, FanEntity):
             self._serial,
             operating_mode=mode,
             fan_speed=speed,
+        )
+
+    async def async_set_state(self, **fields: str) -> None:
+        """Set mode, fan speed, humidity target and light sensor in one command."""
+        if not fields:
+            raise validation_error("set_state_empty")
+        api_values: dict[str, str] = {}
+        for field, option in fields.items():
+            by_option = {API_TO_HA[value]: value for value in STATE_FIELDS[field]}
+            if option not in by_option:
+                raise validation_error(
+                    "unsupported_select_option", placeholders={"option": option}
+                )
+            api_values[field] = by_option[option]
+        if (
+            api_values.get("fan_speed") == "Turbo"
+            and "Turbo" not in self._writable_speeds
+        ):
+            raise validation_error(
+                "unsupported_select_option", placeholders={"option": "turbo"}
+            )
+        await self.coordinator.async_write_state(
+            self._serial,
+            operating_mode=api_values.get("operating_mode"),
+            fan_speed=api_values.get("fan_speed"),
+            humidity_level=api_values.get("humidity_level"),
+            light_sensor_level=api_values.get("light_sensor_level"),
         )
 
     async def async_turn_off(self, **kwargs: Any) -> None:

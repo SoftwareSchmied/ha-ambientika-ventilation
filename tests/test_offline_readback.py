@@ -175,7 +175,8 @@ async def test_unreflected_command_is_shown_optimistically(hass, monkeypatch) ->
     ) as sleep:
         await coordinator.async_write_state(MASTER, operating_mode="Auto")
 
-    assert [call.args for call in sleep.await_args_list] == [(3.0,), (3.0,)]
+    # The first sleep is the (patched) command batching window.
+    assert [call.args for call in sleep.await_args_list][-2:] == [(3.0,), (3.0,)]
     assert api.async_device_status.await_count == 2
     status = coordinator.data.devices[MASTER].status
     assert status.operating_mode == "Auto"

@@ -1,0 +1,162 @@
+# Self-assessment against the Home Assistant Integration Quality Scale.
+# This is not an official rating. Status values: done, todo, or exempt with a
+# comment. Items marked todo are the known gaps before a Core submission.
+rules:
+  # Bronze
+  action-setup:
+    status: exempt
+    comment: >-
+      The only action (set_state) is an entity service registered by the fan
+      platform, not an integration-wide service.
+  appropriate-polling:
+    status: done
+    comment: >-
+      Cloud polling with a 60 s default (configurable 30-600 s), a fast phase
+      after commands, and backoff while the cloud is unreachable.
+  brands:
+    status: todo
+    comment: >-
+      Local brand images are shipped for HACS. A Core submission has to move
+      them to home-assistant/brands.
+  common-modules:
+    status: done
+  config-flow-test-coverage:
+    status: done
+  config-flow:
+    status: done
+  dependency-transparency:
+    status: todo
+    comment: >-
+      The cloud client is embedded in the integration (no PyPI package yet).
+      See docs/CORE_READINESS.md.
+  docs-actions:
+    status: done
+  docs-high-level-description:
+    status: done
+  docs-installation-instructions:
+    status: done
+  docs-removal-instructions:
+    status: done
+  entity-event-setup:
+    status: done
+    comment: >-
+      Hub-backed and derived entities subscribe in async_added_to_hass and
+      unsubscribe through async_on_remove; the runtime listeners are removed on
+      unload.
+  entity-unique-id:
+    status: done
+  has-entity-name:
+    status: done
+  runtime-data:
+    status: done
+  test-before-configure:
+    status: done
+  test-before-setup:
+    status: done
+  unique-config-entry:
+    status: done
+
+  # Silver
+  action-exceptions:
+    status: done
+  config-entry-unloading:
+    status: done
+  docs-configuration-parameters:
+    status: done
+    comment: >-
+      README sections Local data and Derived data describe every option
+      (polling, local reception, raw variants, outdoor source, filter hours,
+      room volumes).
+  docs-installation-parameters:
+    status: done
+  entity-unavailable:
+    status: done
+  integration-owner:
+    status: done
+  log-when-unavailable:
+    status: done
+  parallel-updates:
+    status: done
+    comment: Set on every platform, including the calendar.
+  reauthentication-flow:
+    status: done
+  test-coverage:
+    status: done
+    comment: >-
+      The test suite enforces at least 98 % line and branch coverage
+      (--cov-fail-under in pyproject.toml).
+
+  # Gold
+  devices:
+    status: done
+  diagnostics:
+    status: done
+  discovery-update-info:
+    status: exempt
+    comment: >-
+      Units are reached through the vendor cloud, so a discovered IP address
+      is not stored or used.
+  discovery:
+    status: done
+    comment: DHCP host names VMC_* and GMN_* offer the setup flow.
+  docs-data-update:
+    status: done
+  docs-examples:
+    status: done
+  docs-known-limitations:
+    status: done
+  docs-supported-devices:
+    status: done
+  docs-supported-functions:
+    status: done
+  docs-troubleshooting:
+    status: done
+  docs-use-cases:
+    status: done
+  dynamic-devices:
+    status: done
+  entity-category:
+    status: done
+  entity-device-class:
+    status: done
+    comment: >-
+      The unitless signal strength has no suitable device class and the
+      vendor value is deliberately not given an invented unit.
+  entity-disabled-by-default:
+    status: done
+  entity-translations:
+    status: done
+  exception-translations:
+    status: done
+  icon-translations:
+    status: done
+  reconfiguration-flow:
+    status: done
+  repair-issues:
+    status: done
+    comment: >-
+      Repair issues for local UDP reception (port cannot be bound, no frames
+      arrive) with the network requirements. A rejected token starts the
+      reauthentication flow instead; a long cloud outage is shown by the cloud
+      reachability entity and not as an issue.
+  stale-devices:
+    status: done
+    comment: >-
+      Manual removal is limited to devices the cloud no longer reports, and
+      devices missing from four consecutive successful discoveries (24 h) are
+      removed automatically.
+
+  # Platinum
+  async-dependency:
+    status: done
+  inject-websession:
+    status: exempt
+    comment: >-
+      A dedicated session keeps connections alive for about two minutes, which
+      the shared Home Assistant session (15 s) does not; every poll would
+      otherwise open a new TLS connection.
+  strict-typing:
+    status: todo
+    comment: >-
+      mypy --strict passes for the integration, but the package is not part of
+      Home Assistant's strict-typing list and has no typed PyPI library.

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import UTC, datetime
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
@@ -25,6 +24,7 @@ from custom_components.ambientika_ventilation.button import (
 )
 from custom_components.ambientika_ventilation.const import DISCOVERY_INTERVAL, DOMAIN
 from custom_components.ambientika_ventilation.coordinator import AmbientikaCoordinator
+from custom_components.ambientika_ventilation.entity import AmbientikaHubEntity
 from custom_components.ambientika_ventilation.fan import async_setup_entry as setup_fans
 from custom_components.ambientika_ventilation.models import parse_houses
 from custom_components.ambientika_ventilation.select import (
@@ -39,6 +39,8 @@ from custom_components.ambientika_ventilation.switch import (
 )
 from homeassistant.exceptions import ConfigEntryAuthFailed, ServiceValidationError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+from .hub_helpers import fake_entry
 
 MASTER = "AABBCCDDEEFF"
 SLAVE = "FFEEDDCCBBAA"
@@ -271,7 +273,11 @@ async def test_schedule_discovery_remains_master_only(slave_coordinator):
     coordinator, api = slave_coordinator
     api.async_feature_flags.return_value = {"weeklyScheduler": True}
     api.async_schedule.return_value = {"timeSlots": []}
+    api.async_house_devices_status.return_value["zoneDevicesInfo"][0]["statusPacket"][
+        "isScheduled"
+    ] = "Off"
     await coordinator._async_discover()
+    await coordinator._async_update_data()
 
     api.async_schedule.assert_awaited_once_with(1)
 
@@ -298,11 +304,8 @@ async def test_slave_platforms_remain_read_only_with_conflicting_roles(
     )
     await coordinator.async_refresh()
     # Exercise dynamic platform discovery without scheduling real polling timers.
-    coordinator.async_add_listener = MagicMock(return_value=MagicMock())
-    entry = SimpleNamespace(
-        runtime_data=SimpleNamespace(coordinator=coordinator),
-        async_on_unload=MagicMock(),
-    )
+    coordinator.async_add_topology_listener = MagicMock(return_value=MagicMock())
+    entry = fake_entry(coordinator)
     for setup in (setup_fans, setup_selects, setup_switches, setup_buttons):
         entities = []
         await setup(hass, entry, entities.extend)
@@ -311,8 +314,18 @@ async def test_slave_platforms_remain_read_only_with_conflicting_roles(
     for setup in (setup_sensors, setup_binary_sensors):
         entities = []
         await setup(hass, entry, entities.extend)
-        slave_entities = [entity for entity in entities if entity._serial == SLAVE]
+        slave_entities = [
+            entity
+            for entity in entities
+            if getattr(entity, "_serial", None) == SLAVE
+            and not isinstance(entity, AmbientikaHubEntity)
+        ]
         assert slave_entities
+        # Zone members also get the hub-backed entities, which only read.
+        assert any(
+            isinstance(entity, AmbientikaHubEntity) and entity._serial == SLAVE
+            for entity in entities
+        )
         assert all(entity.available for entity in slave_entities)
         assert all(
             entity.unique_id.startswith(f"{SLAVE}_") for entity in slave_entities
@@ -367,16 +380,13 @@ async def test_late_slave_status_adds_entities_once_and_tracks_availability(
     coordinator, api = slave_coordinator
     api.async_device_status.side_effect = AmbientikaApiError
     await coordinator.async_refresh()
-    coordinator.async_add_listener = MagicMock(return_value=MagicMock())
-    entry = SimpleNamespace(
-        runtime_data=SimpleNamespace(coordinator=coordinator),
-        async_on_unload=MagicMock(),
-    )
+    coordinator.async_add_topology_listener = MagicMock(return_value=MagicMock())
+    entry = fake_entry(coordinator)
     entities = []
     callbacks = []
     for setup in (setup_sensors, setup_binary_sensors):
         await setup(hass, entry, entities.extend)
-        callbacks.append(coordinator.async_add_listener.call_args.args[0])
+        callbacks.append(coordinator.async_add_topology_listener.call_args.args[0])
     assert not any(entity.unique_id == f"{SLAVE}_temperature" for entity in entities)
 
     api.async_device_status.side_effect = None

@@ -13,6 +13,7 @@ from .const import (
     HUMIDITY_LEVELS,
     LIGHT_SENSOR_LEVELS,
     OPERATING_MODES,
+    REPORTED_OPERATING_MODES,
     SCHEDULE_STATES,
 )
 
@@ -154,6 +155,22 @@ class AmbientikaData:
     devices: dict[str, AmbientikaDeviceData] = field(default_factory=dict)
     feature_flags: dict[str, bool] = field(default_factory=dict)
     failed_devices: frozenset[str] = field(default_factory=frozenset)
+    offline_devices: frozenset[str] = field(default_factory=frozenset)
+
+
+@dataclass(frozen=True, slots=True)
+class AmbientikaDeviceMetadata:
+    """Device metadata carried by every house status response.
+
+    ``None`` means the response did not contain the value, never a change.
+    """
+
+    name: str | None = None
+    role: str | None = None
+    micro_firmware: str | None = None
+    radio_firmware: str | None = None
+    radio_at_firmware: str | None = None
+    zone_index: int | None = None
 
 
 def _mapping(value: object) -> dict[str, Any]:
@@ -184,6 +201,11 @@ def _number(value: object) -> float | None:
     if isinstance(value, int | float) and not isinstance(value, bool):
         return float(value)
     return None
+
+
+def _casefolded(raw: dict[str, Any]) -> dict[str, Any]:
+    """Return a mapping with lower-case keys; the cloud mixes camel and Pascal case."""
+    return {key.casefold(): value for key, value in raw.items() if isinstance(key, str)}
 
 
 def _boolean(value: object) -> bool | None:
@@ -415,8 +437,8 @@ def is_controllable_device(
 
 def parse_status(payload: object, fallback_serial: str) -> AmbientikaStatus:
     """Parse a status payload while accepting missing and unknown values."""
-    raw = _mapping(payload)
-    serial = _text(raw.get("deviceSerialNumber")) or fallback_serial
+    raw = _casefolded(_mapping(payload))
+    serial = _text(raw.get("deviceserialnumber")) or fallback_serial
     humidity = _integer(raw.get("humidity"))
     if humidity is not None and not 0 <= humidity <= 100:
         humidity = None
@@ -425,14 +447,18 @@ def parse_status(payload: object, fallback_serial: str) -> AmbientikaStatus:
     if temperature is not None and not -60 <= temperature <= 100:
         temperature = None
 
-    signal_strength = _integer(raw.get("signalStrenght"))
+    signal_strength = _integer(raw.get("signalstrenght"))
     if signal_strength is None:
-        signal_strength = _integer(raw.get("signalStrength"))
+        signal_strength = _integer(raw.get("signalstrength"))
+    light_sensor_level = _enum(raw.get("lightsensorlevel"), LIGHT_SENSOR_LEVELS)
+    if signal_strength == 0 and light_sensor_level == "NotAvailable":
+        # Firmware 0.0.11 sends 19-byte packets without a signal field.
+        signal_strength = None
 
     return AmbientikaStatus(
         serial_number=serial,
         packet_type=_enum(
-            raw.get("packetType"),
+            raw.get("packettype"),
             (
                 "Connection",
                 "Status",
@@ -443,27 +469,44 @@ def parse_status(payload: object, fallback_serial: str) -> AmbientikaStatus:
             ),
         ),
         device_type=_enum(
-            raw.get("deviceType"), ("Ghost", "Diamond", "Icon", "Gemini")
+            raw.get("devicetype"), ("Ghost", "Diamond", "Icon", "Gemini")
         ),
         device_subtype=_enum(
-            raw.get("deviceSubtype"),
+            raw.get("devicesubtype"),
             ("None", "Version100", "Version160", "Version200"),
         ),
-        operating_mode=_enum(raw.get("operatingMode"), OPERATING_MODES),
-        fan_speed=_enum(raw.get("fanSpeed"), FAN_SPEEDS),
-        humidity_level=_enum(raw.get("humidityLevel"), HUMIDITY_LEVELS),
-        light_sensor_level=_enum(raw.get("lightSensorLevel"), LIGHT_SENSOR_LEVELS),
+        operating_mode=_enum(raw.get("operatingmode"), REPORTED_OPERATING_MODES),
+        fan_speed=_enum(raw.get("fanspeed"), FAN_SPEEDS),
+        humidity_level=_enum(raw.get("humiditylevel"), HUMIDITY_LEVELS),
+        light_sensor_level=light_sensor_level,
         temperature=temperature,
         humidity=humidity,
-        air_quality=_enum(raw.get("airQuality"), AIR_QUALITY_LEVELS),
-        humidity_alarm=_boolean(raw.get("humidityAlarm")),
-        filter_status=_enum(raw.get("filtersStatus"), FILTER_STATUSES),
-        night_alarm=_boolean(raw.get("nightAlarm")),
-        device_role=_device_role(raw.get("deviceRole")),
-        last_operating_mode=_enum(raw.get("lastOperatingMode"), OPERATING_MODES),
+        air_quality=_enum(raw.get("airquality"), AIR_QUALITY_LEVELS),
+        humidity_alarm=_boolean(raw.get("humidityalarm")),
+        filter_status=_enum(raw.get("filtersstatus"), FILTER_STATUSES),
+        night_alarm=_boolean(raw.get("nightalarm")),
+        device_role=_device_role(raw.get("devicerole")),
+        last_operating_mode=_enum(
+            raw.get("lastoperatingmode"), REPORTED_OPERATING_MODES
+        ),
         signal_strength=signal_strength,
-        schedule_state=_enum(raw.get("isScheduled"), SCHEDULE_STATES),
-        turbo_available=_boolean(raw.get("isTurboAvailable")) is True,
+        schedule_state=_enum(raw.get("isscheduled"), SCHEDULE_STATES),
+        turbo_available=_boolean(raw.get("isturboavailable")) is True,
+    )
+
+
+def turbo_usable(
+    status: AmbientikaStatus | None, feature_flags: dict[str, bool]
+) -> bool:
+    """Return whether Turbo may be offered, as the official app decides.
+
+    The unit must report ``isTurboAvailable`` and the server feature flag
+    ``turboMode`` must not be switched off; a missing flag counts as enabled.
+    """
+    return (
+        status is not None
+        and status.turbo_available
+        and feature_flags.get("turboMode", True)
     )
 
 
@@ -487,6 +530,37 @@ def parse_house_statuses(payload: object) -> dict[str, AmbientikaStatus]:
         if serial is not None:
             statuses[serial] = parse_status(packet_mapping, serial)
     return statuses
+
+
+def parse_house_status_metadata(
+    payload: object,
+) -> dict[str, AmbientikaDeviceMetadata]:
+    """Extract per-device metadata from the zone tree of a house batch response."""
+    raw = _mapping(payload)
+    raw_devices: list[object] = []
+    for item in _list(raw.get("zoneDevicesInfo")):
+        zone = _mapping(_mapping(item).get("zone"))
+        for room in _list(zone.get("rooms")):
+            raw_devices.extend(_list(_mapping(room).get("devices")))
+    raw_devices.extend(
+        _mapping(item).get("device") for item in _list(raw.get("geminiDevicesInfo"))
+    )
+
+    metadata: dict[str, AmbientikaDeviceMetadata] = {}
+    for raw_device in raw_devices:
+        device = _mapping(raw_device)
+        serial = _text(device.get("serialNumber"))
+        if serial is None:
+            continue
+        metadata[serial] = AmbientikaDeviceMetadata(
+            name=_text(device.get("name")),
+            role=_device_role(device.get("role")),
+            micro_firmware=_text(device.get("microFwVersion")),
+            radio_firmware=_text(device.get("radioFwVersion")),
+            radio_at_firmware=_text(device.get("radioAtCommandsFwVersion")),
+            zone_index=_integer(device.get("zoneIndex")),
+        )
+    return metadata
 
 
 def parse_schedule(payload: object) -> AmbientikaSchedule:

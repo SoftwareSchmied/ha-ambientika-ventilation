@@ -7,11 +7,13 @@
         "description": "Gib die Zugangsdaten der Ambientika-App ein.",
         "data": {
           "username": "E-Mail-Adresse",
-          "password": "Passwort"
+          "password": "Passwort",
+          "token_only": "Passwort nicht speichern"
         },
         "data_description": {
           "username": "E-Mail-Adresse, die in der Ambientika-App registriert ist.",
-          "password": "Passwort des Ambientika-Cloud-Kontos."
+          "password": "Passwort des Ambientika-Cloud-Kontos.",
+          "token_only": "Speichert nur das erneuerbare Zugriffstoken. Das Passwort liegt nicht im Home-Assistant-Speicher; kann das Token nicht rechtzeitig erneuert werden, wirst du zur erneuten Anmeldung aufgefordert. Home Assistant muss dafür mindestens alle paar Monate laufen."
         }
       },
       "reauth_confirm": {
@@ -19,11 +21,13 @@
         "description": "Gib gültige Ambientika-Zugangsdaten ein, um den Zugriff wiederherzustellen.",
         "data": {
           "username": "E-Mail-Adresse",
-          "password": "Passwort"
+          "password": "Passwort",
+          "token_only": "Passwort nicht speichern"
         },
         "data_description": {
           "username": "E-Mail-Adresse, die in der Ambientika-App registriert ist.",
-          "password": "Aktuelles Passwort des Ambientika-Cloud-Kontos."
+          "password": "Aktuelles Passwort des Ambientika-Cloud-Kontos.",
+          "token_only": "Speichert nur das erneuerbare Zugriffstoken. Das Passwort liegt nicht im Home-Assistant-Speicher; kann das Token nicht rechtzeitig erneuert werden, wirst du zur erneuten Anmeldung aufgefordert. Home Assistant muss dafür mindestens alle paar Monate laufen."
         }
       },
       "reconfigure": {
@@ -31,11 +35,13 @@
         "description": "Gib die aktuellen Zugangsdaten desselben Ambientika-Kontos ein.",
         "data": {
           "username": "E-Mail-Adresse",
-          "password": "Passwort"
+          "password": "Passwort",
+          "token_only": "Passwort nicht speichern"
         },
         "data_description": {
           "username": "E-Mail-Adresse, die in der Ambientika-App registriert ist.",
-          "password": "Aktuelles Passwort des Ambientika-Cloud-Kontos."
+          "password": "Aktuelles Passwort des Ambientika-Cloud-Kontos.",
+          "token_only": "Speichert nur das erneuerbare Zugriffstoken. Das Passwort liegt nicht im Home-Assistant-Speicher; kann das Token nicht rechtzeitig erneuert werden, wirst du zur erneuten Anmeldung aufgefordert. Home Assistant muss dafür mindestens alle paar Monate laufen."
         }
       }
     },
@@ -54,61 +60,846 @@
     }
   },
   "exceptions": {
-    "device_unavailable": { "message": "Für das Lüftungsgerät ist kein lesbarer Zustand verfügbar." },
-    "device_not_controllable": { "message": "Nur Zonen-Mastergeräte können gesteuert werden." },
-    "controls_locked_filter": { "message": "Die Gerätesteuerung ist gesperrt, bis der Filterstatus zurückgesetzt wurde." },
-    "controls_locked_schedule": { "message": "Deaktiviere den Wochenzeitplan, bevor du manuelle Einstellungen änderst." },
-    "unsupported_operating_mode": { "message": "Die Betriebsart {mode} wird von diesem Gerätetyp nicht unterstützt." },
-    "setting_unavailable": { "message": "{setting} kann in der Betriebsart {mode} nicht geändert werden." },
-    "schedule_unsupported": { "message": "Dieses Gerät unterstützt keine Wochenzeitplanung." },
-    "incomplete_writable_state": { "message": "Das Gerät hat keinen vollständigen schreibbaren Zustand gemeldet." },
-    "cloud_command_failed": { "message": "Die Ambientika-Cloud hat den Befehl nicht angenommen." },
-    "filter_reset_failed": { "message": "Der Filterstatus konnte über die Ambientika-Cloud nicht zurückgesetzt werden." },
-    "unsupported_preset_mode": { "message": "Die Lüfter-Voreinstellung {preset} wird nicht unterstützt." },
-    "invalid_fan_percentage": { "message": "Der Lüfterwert muss zwischen 1 und 100 Prozent liegen." },
-    "unsupported_select_option": { "message": "Die Option {option} wird nicht unterstützt." },
-    "device_offline": { "message": "Das Lüftungsgerät hat nicht auf den Befehl reagiert. Prüfe in der Ambientika-App, ob es online ist." },
-    "auth_failed": { "message": "Die Ambientika-Cloud hat die gespeicherten Zugangsdaten abgelehnt. Melde die Integration erneut an." }
+    "device_unavailable": {
+      "message": "Für das Lüftungsgerät ist kein lesbarer Zustand verfügbar."
+    },
+    "device_not_controllable": {
+      "message": "Nur Zonen-Mastergeräte können gesteuert werden."
+    },
+    "controls_locked_filter": {
+      "message": "Die Gerätesteuerung ist gesperrt, bis der Filterstatus zurückgesetzt wurde."
+    },
+    "controls_locked_schedule": {
+      "message": "Deaktiviere den Wochenzeitplan, bevor du manuelle Einstellungen änderst."
+    },
+    "unsupported_operating_mode": {
+      "message": "Die Betriebsart {mode} wird von diesem Gerätetyp nicht unterstützt."
+    },
+    "setting_unavailable": {
+      "message": "{setting} kann in der Betriebsart {mode} nicht geändert werden."
+    },
+    "schedule_unsupported": {
+      "message": "Dieses Gerät unterstützt keine Wochenzeitplanung."
+    },
+    "incomplete_writable_state": {
+      "message": "Das Gerät hat keinen vollständigen schreibbaren Zustand gemeldet."
+    },
+    "cloud_command_failed": {
+      "message": "Die Ambientika-Cloud hat den Befehl nicht angenommen."
+    },
+    "filter_reset_failed": {
+      "message": "Der Filterstatus konnte über die Ambientika-Cloud nicht zurückgesetzt werden."
+    },
+    "unsupported_preset_mode": {
+      "message": "Die Lüfter-Voreinstellung {preset} wird nicht unterstützt."
+    },
+    "invalid_fan_percentage": {
+      "message": "Der Lüfterwert muss zwischen 1 und 100 Prozent liegen."
+    },
+    "unsupported_select_option": {
+      "message": "Die Option {option} wird nicht unterstützt."
+    },
+    "device_offline": {
+      "message": "Das Lüftungsgerät hat nicht auf den Befehl reagiert. Prüfe in der Ambientika-App, ob es online ist."
+    },
+    "auth_failed": {
+      "message": "Die Ambientika-Cloud hat die gespeicherten Zugangsdaten abgelehnt. Melde die Integration erneut an."
+    },
+    "set_state_empty": {
+      "message": "Gib mindestens einen Wert an."
+    },
+    "update_failed": {
+      "message": "Aktualisierung aus der Ambientika-Cloud nicht möglich: {details}"
+    },
+    "schedule_read_only": {
+      "message": "Der Wochenzeitplan dieses Geräts ist schreibgeschützt. Das Konto braucht die Wochenzeitplan-Funktion und das Gerät muss einen Zeitplan melden."
+    },
+    "schedule_write_failed": {
+      "message": "Die Ambientika-Cloud hat die Zeitplanänderung nicht angenommen."
+    },
+    "schedule_invalid_id": {
+      "message": "{value} ist keine gültige Kennung."
+    },
+    "schedule_invalid_day": {
+      "message": "{value} ist kein gültiger Wochentag."
+    },
+    "schedule_invalid_time": {
+      "message": "Die {field}-Zeit muss eine Uhrzeit ohne Sekunden sein, zum Beispiel 07:30."
+    },
+    "schedule_time_order": {
+      "message": "Die Startzeit muss am selben Tag vor der Endzeit liegen. Zeitfenster können nicht über Mitternacht gehen."
+    },
+    "schedule_invalid_value": {
+      "message": "{value} ist für {field} in einem Zeitfenster nicht erlaubt."
+    },
+    "time_slot_overlap": {
+      "message": "Das Zeitfenster überschneidet sich mit einem anderen Zeitfenster am selben Tag."
+    },
+    "time_slot_not_found": {
+      "message": "Dieses Zeitfenster existiert nicht."
+    },
+    "time_slot_incomplete": {
+      "message": "Ein neues Zeitfenster braucht Tag, Startzeit, Endzeit und Betriebsart."
+    },
+    "clear_schedule_not_confirmed": {
+      "message": "Schalte die Bestätigung ein, um alle Zeitfenster zu löschen."
+    },
+    "calendar_event_not_weekly": {
+      "message": "Nur Termine, die wöchentlich an ihrem eigenen Wochentag wiederkehren, lassen sich als Zeitfenster speichern, ohne Enddatum, Anzahl oder Intervall."
+    },
+    "calendar_event_not_representable": {
+      "message": "Ein Zeitfenster beginnt und endet am selben Tag zur vollen Minute. Ganztägige Termine lassen sich nicht speichern."
+    },
+    "calendar_event_mode_missing": {
+      "message": "Nenne die Betriebsart im Titel (zum Beispiel Nacht) oder schreibe mode: night in die Beschreibung."
+    },
+    "calendar_recurrence_unsupported": {
+      "message": "Ein einzelnes Vorkommen lässt sich nicht ändern. Bearbeite oder lösche den gesamten wöchentlichen Termin."
+    }
   },
   "entity": {
-    "fan": { "ventilation": { "name": "Lüftung", "state_attributes": { "preset_mode": { "state": { "night": "Nacht" } } } } },
+    "fan": {
+      "ventilation": {
+        "name": "Lüftung",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "night": "Nacht"
+            }
+          }
+        }
+      }
+    },
     "sensor": {
-      "temperature": { "name": "Temperatur" },
-      "humidity": { "name": "Luftfeuchtigkeit" },
-      "signal_strength": { "name": "Signalstärke" },
-      "air_quality": { "name": "Luftqualität", "state": { "very_good": "Sehr gut", "good": "Gut", "medium": "Mittel", "poor": "Schlecht", "bad": "Sehr schlecht" } },
-      "filter_status": { "name": "Filterstatus", "state": { "good": "Gut", "medium": "Bald wechseln", "bad": "Wechseln" } },
-      "packet_type": { "name": "Pakettyp" },
-      "last_operating_mode": { "name": "Letzte Betriebsart", "state": { "smart": "Smart", "auto": "Automatik", "heat_recovery": "Wärmerückgewinnung", "night": "Nacht", "away": "Abwesend", "surveillance": "Überwachung", "timed_extraction": "Zeitgesteuerte Abluft", "extraction": "Abluft", "intake": "Zuluft", "master_slave_flow": "Master-zu-Slave-Luftstrom", "slave_master_flow": "Slave-zu-Master-Luftstrom", "off": "Aus" } },
-      "device_type": { "name": "Gerätetyp" },
-      "device_subtype": { "name": "Geräteuntertyp" },
-      "device_role": { "name": "Geräterolle", "state": { "master": "Master", "slave_equal_master": "Slave synchron", "slave_opposite_master": "Slave alternierend", "not_configured": "Nicht konfiguriert" } },
-      "installation": { "name": "Installation" },
-      "micro_firmware": { "name": "Controller-Firmware" },
-      "radio_firmware": { "name": "Funk-Firmware" },
-      "radio_at_firmware": { "name": "Funk-AT-Firmware" },
-      "house": { "name": "Haus" },
-      "zone": { "name": "Zone" },
-      "room": { "name": "Raum" },
-      "device_id": { "name": "Cloud-Geräte-ID" },
-      "house_id": { "name": "Cloud-Haus-ID" },
-      "room_id": { "name": "Cloud-Raum-ID" },
-      "zone_id": { "name": "Cloud-Zonen-ID" },
-      "zone_index": { "name": "Zonenindex" },
-      "schedule_entries": { "name": "Zeitplaneinträge" }
+      "temperature": {
+        "name": "Temperatur"
+      },
+      "humidity": {
+        "name": "Luftfeuchtigkeit"
+      },
+      "signal_strength": {
+        "name": "Signalstärke"
+      },
+      "air_quality": {
+        "name": "Luftqualität",
+        "state": {
+          "very_good": "Sehr gut",
+          "good": "Gut",
+          "medium": "Mittel",
+          "poor": "Schlecht",
+          "bad": "Sehr schlecht"
+        }
+      },
+      "filter_status": {
+        "name": "Filterstatus",
+        "state": {
+          "good": "Gut",
+          "medium": "Bald wechseln",
+          "bad": "Wechseln"
+        }
+      },
+      "packet_type": {
+        "name": "Pakettyp"
+      },
+      "last_operating_mode": {
+        "name": "Letzte Betriebsart",
+        "state": {
+          "smart": "Smart",
+          "auto": "Automatik",
+          "heat_recovery": "Wärmerückgewinnung",
+          "night": "Nacht",
+          "away": "Abwesend",
+          "surveillance": "Überwachung",
+          "timed_extraction": "Zeitgesteuerte Abluft",
+          "extraction": "Abluft",
+          "intake": "Zuluft",
+          "master_slave_flow": "Master-zu-Slave-Luftstrom",
+          "slave_master_flow": "Slave-zu-Master-Luftstrom",
+          "off": "Aus",
+          "turbo": "Turbo (alt)"
+        }
+      },
+      "device_type": {
+        "name": "Gerätetyp"
+      },
+      "device_subtype": {
+        "name": "Geräteuntertyp"
+      },
+      "device_role": {
+        "name": "Geräterolle",
+        "state": {
+          "master": "Master",
+          "slave_equal_master": "Slave synchron",
+          "slave_opposite_master": "Slave alternierend",
+          "not_configured": "Nicht konfiguriert"
+        }
+      },
+      "installation": {
+        "name": "Installation"
+      },
+      "micro_firmware": {
+        "name": "Controller-Firmware"
+      },
+      "radio_firmware": {
+        "name": "Funk-Firmware"
+      },
+      "radio_at_firmware": {
+        "name": "Funk-AT-Firmware"
+      },
+      "house": {
+        "name": "Haus"
+      },
+      "zone": {
+        "name": "Zone"
+      },
+      "room": {
+        "name": "Raum"
+      },
+      "device_id": {
+        "name": "Cloud-Geräte-ID"
+      },
+      "house_id": {
+        "name": "Cloud-Haus-ID"
+      },
+      "room_id": {
+        "name": "Cloud-Raum-ID"
+      },
+      "zone_id": {
+        "name": "Cloud-Zonen-ID"
+      },
+      "zone_index": {
+        "name": "Zonenindex"
+      },
+      "schedule_entries": {
+        "name": "Zeitplaneinträge"
+      },
+      "direction": {
+        "name": "Physische Richtung",
+        "state": {
+          "stopped": "Steht",
+          "exhaust": "Abluft",
+          "intake": "Zuluft"
+        }
+      },
+      "physical_stage": {
+        "name": "Physische Lüfterstufe",
+        "state": {
+          "night": "Nacht",
+          "low": "Niedrig",
+          "medium": "Mittel",
+          "high": "Hoch"
+        }
+      },
+      "coupling": {
+        "name": "Zonenkopplung",
+        "state": {
+          "idle": "Ruhe",
+          "opposite": "Gegenläufig",
+          "same": "Gleichlaufend"
+        }
+      },
+      "data_source": {
+        "name": "Datenquelle",
+        "state": {
+          "local_udp": "Lokal (UDP)",
+          "cloud": "Cloud",
+          "degraded": "Eingeschränkt",
+          "offline": "Offline"
+        }
+      },
+      "heartbeat_age": {
+        "name": "Alter des lokalen Heartbeats"
+      },
+      "last_seen": {
+        "name": "Zuletzt gesehen"
+      },
+      "last_seen_cloud": {
+        "name": "Zuletzt gesehen (Cloud)"
+      },
+      "last_seen_local": {
+        "name": "Zuletzt gesehen (lokal)"
+      },
+      "cloud_consecutive_failures": {
+        "name": "Aufeinanderfolgende Cloud-Fehler"
+      },
+      "cloud_success_rate": {
+        "name": "Cloud-Erfolgsquote"
+      },
+      "cloud_last_latency": {
+        "name": "Letzte Cloud-Latenz"
+      },
+      "cloud_last_success": {
+        "name": "Letzter Cloud-Erfolg"
+      },
+      "cloud_last_failure_kind": {
+        "name": "Letzte Cloud-Fehlerart"
+      },
+      "operating_hours": {
+        "name": "Betriebsstunden"
+      },
+      "on_hours": {
+        "name": "Einschaltdauer"
+      },
+      "operating_hours_today": {
+        "name": "Betriebsstunden heute"
+      },
+      "runtime_mode_smart": {
+        "name": "Laufzeit Smart"
+      },
+      "runtime_mode_auto": {
+        "name": "Laufzeit Auto"
+      },
+      "runtime_mode_heat_recovery": {
+        "name": "Laufzeit Wärmerückgewinnung"
+      },
+      "runtime_mode_night": {
+        "name": "Laufzeit Nacht"
+      },
+      "runtime_mode_away": {
+        "name": "Laufzeit Abwesend"
+      },
+      "runtime_mode_surveillance": {
+        "name": "Laufzeit Überwachung"
+      },
+      "runtime_mode_timed_extraction": {
+        "name": "Laufzeit Zeitgesteuerte Abluft"
+      },
+      "runtime_mode_extraction": {
+        "name": "Laufzeit Abluft"
+      },
+      "runtime_mode_intake": {
+        "name": "Laufzeit Zuluft"
+      },
+      "runtime_mode_master_slave_flow": {
+        "name": "Laufzeit Fluss Master zu Slave"
+      },
+      "runtime_mode_slave_master_flow": {
+        "name": "Laufzeit Fluss Slave zu Master"
+      },
+      "runtime_mode_off": {
+        "name": "Ausgeschaltet-Dauer"
+      },
+      "runtime_mode_turbo": {
+        "name": "Laufzeit Turbo"
+      },
+      "runtime_stage_night": {
+        "name": "Laufzeit Stufe Nacht"
+      },
+      "runtime_stage_low": {
+        "name": "Laufzeit Stufe Niedrig"
+      },
+      "runtime_stage_medium": {
+        "name": "Laufzeit Stufe Mittel"
+      },
+      "runtime_stage_high": {
+        "name": "Laufzeit Stufe Hoch"
+      },
+      "runtime_stage_turbo": {
+        "name": "Laufzeit Stufe Turbo"
+      },
+      "runtime_direction_exhaust": {
+        "name": "Laufzeit Abluft"
+      },
+      "runtime_direction_intake": {
+        "name": "Laufzeit Zuluft"
+      },
+      "runtime_direction_stopped": {
+        "name": "Laufzeit Stillstand oder Umkehr"
+      },
+      "reversals": {
+        "name": "Richtungswechsel"
+      },
+      "heat_recovery_cycles": {
+        "name": "Wärmerückgewinnungs-Zyklen"
+      },
+      "half_cycle_duration": {
+        "name": "Halbzyklus-Dauer"
+      },
+      "airflow": {
+        "name": "Luftmenge"
+      },
+      "fresh_air_flow": {
+        "name": "Frischluftmenge"
+      },
+      "air_volume": {
+        "name": "Bewegtes Luftvolumen"
+      },
+      "air_change_rate": {
+        "name": "Luftwechselrate"
+      },
+      "power_estimate": {
+        "name": "Geschätzte Leistung"
+      },
+      "energy_estimate": {
+        "name": "Geschätzte Energie"
+      },
+      "heat_recovered_power": {
+        "name": "Zurückgewonnene Wärme Leistung"
+      },
+      "heat_recovered_energy": {
+        "name": "Zurückgewonnene Wärme Energie"
+      },
+      "ventilation_loss_power": {
+        "name": "Lüftungswärmeverlust Leistung"
+      },
+      "ventilation_loss_energy": {
+        "name": "Lüftungswärmeverlust Energie"
+      },
+      "moisture_recovered": {
+        "name": "Zurückgewonnene Feuchte"
+      },
+      "dew_point": {
+        "name": "Taupunkt"
+      },
+      "absolute_humidity": {
+        "name": "Absolute Feuchte"
+      },
+      "humidity_setpoint": {
+        "name": "Feuchte-Sollwert"
+      },
+      "humidity_setpoint_distance": {
+        "name": "Feuchte-Abstand zum Sollwert"
+      },
+      "comfort": {
+        "name": "Feuchtekomfort",
+        "state": {
+          "too_dry": "Zu trocken",
+          "dry": "Trocken",
+          "comfortable": "Behaglich",
+          "humid": "Feucht",
+          "too_humid": "Zu feucht"
+        }
+      },
+      "room_temperature": {
+        "name": "Raumtemperatur (zuletzt gültig)"
+      },
+      "room_humidity": {
+        "name": "Raumfeuchte (zuletzt gültig)"
+      },
+      "measurement_context": {
+        "name": "Messkontext",
+        "state": {
+          "stopped": "Steht",
+          "settling": "Einpendelnd",
+          "exhaust": "Abluft",
+          "intake": "Zuluft",
+          "reversing": "Umkehr",
+          "running": "Läuft",
+          "unknown": "Unbekannt"
+        }
+      },
+      "measurement_last_valid": {
+        "name": "Letzte gültige Messung"
+      },
+      "drying_potential": {
+        "name": "Trocknungspotenzial"
+      },
+      "air_quality_index": {
+        "name": "Luftqualitätsindex"
+      },
+      "filter_hours": {
+        "name": "Filter-Betriebsstunden"
+      },
+      "filter_remaining_hours": {
+        "name": "Filter-Restlaufzeit"
+      },
+      "filter_alarm_predicted": {
+        "name": "Filteralarm voraussichtlich am"
+      },
+      "filter_clean_due": {
+        "name": "Filterreinigung fällig"
+      },
+      "filter_replace_due": {
+        "name": "Filterwechsel fällig"
+      },
+      "filter_last_reset": {
+        "name": "Filter zuletzt zurückgesetzt"
+      },
+      "filter_medium_hours": {
+        "name": "Filterstunden bei Mittel"
+      },
+      "filter_alarm_hours": {
+        "name": "Filterstunden bei Alarm"
+      },
+      "smart_behaviour": {
+        "name": "Smart-Verhalten",
+        "state": {
+          "idle": "Ruhe",
+          "heat_recovery": "Wärmerückgewinnung",
+          "night_heat_recovery": "Nacht-Wärmerückgewinnung",
+          "free_cooling": "Freie Kühlung"
+        }
+      },
+      "timed_exhaust_ends": {
+        "name": "Zeitabluft endet"
+      },
+      "damper_state": {
+        "name": "Klappenzustand",
+        "state": {
+          "closed": "Geschlossen",
+          "opening": "Öffnet",
+          "open": "Offen",
+          "closing": "Schließt"
+        }
+      },
+      "humidity_alarm_duration": {
+        "name": "Feuchtealarm Dauer"
+      },
+      "humidity_alarm_today": {
+        "name": "Feuchtealarm heute"
+      },
+      "humidity_alarm_current": {
+        "name": "Feuchtealarm aktuell"
+      },
+      "night_alarm_duration": {
+        "name": "Nachtalarm Dauer"
+      },
+      "night_alarm_today": {
+        "name": "Nachtalarm heute"
+      },
+      "night_alarm_current": {
+        "name": "Nachtalarm aktuell"
+      },
+      "command_latency": {
+        "name": "Letzte Befehlslatenz"
+      },
+      "command_latency_cloud": {
+        "name": "Befehlslatenz (Cloud)"
+      },
+      "command_latency_local": {
+        "name": "Befehlslatenz (lokal)"
+      },
+      "command_latency_average": {
+        "name": "Mittlere Befehlslatenz"
+      },
+      "commands_sent": {
+        "name": "Gesendete Befehle"
+      },
+      "commands_confirmed": {
+        "name": "Bestätigte Befehle"
+      },
+      "commands_unconfirmed": {
+        "name": "Unbestätigte Befehle"
+      },
+      "commands_rejected": {
+        "name": "Abgelehnte Befehle"
+      },
+      "zone_airflow": {
+        "name": "Zone Luftmenge"
+      },
+      "zone_power": {
+        "name": "Zone geschätzte Leistung"
+      },
+      "zone_energy": {
+        "name": "Zone geschätzte Energie"
+      },
+      "zone_air_volume": {
+        "name": "Zone bewegtes Luftvolumen"
+      },
+      "zone_running_units": {
+        "name": "Zone laufende Geräte"
+      },
+      "zone_units": {
+        "name": "Zone Geräte"
+      },
+      "zone_heat_recovered_power": {
+        "name": "Zone zurückgewonnene Wärme Leistung"
+      },
+      "zone_heat_recovered_energy": {
+        "name": "Zone zurückgewonnene Wärme Energie"
+      },
+      "house_airflow": {
+        "name": "Haus Luftmenge"
+      },
+      "house_power": {
+        "name": "Haus geschätzte Leistung"
+      },
+      "house_energy": {
+        "name": "Haus geschätzte Energie"
+      },
+      "house_air_volume": {
+        "name": "Haus bewegtes Luftvolumen"
+      },
+      "house_running_units": {
+        "name": "Haus laufende Geräte"
+      },
+      "house_units": {
+        "name": "Haus Geräte"
+      },
+      "house_heat_recovered_power": {
+        "name": "Haus zurückgewonnene Wärme Leistung"
+      },
+      "house_heat_recovered_energy": {
+        "name": "Haus zurückgewonnene Wärme Energie"
+      },
+      "outdoor_dew_point": {
+        "name": "Außentaupunkt"
+      },
+      "outdoor_absolute_humidity": {
+        "name": "Absolute Außenfeuchte"
+      },
+      "house_address": {
+        "name": "Adresse des Hauses"
+      },
+      "house_latitude": {
+        "name": "Breitengrad des Hauses"
+      },
+      "house_longitude": {
+        "name": "Längengrad des Hauses"
+      },
+      "house_time_zone": {
+        "name": "Zeitzone des Hauses"
+      },
+      "house_time": {
+        "name": "Uhrzeit des Hauses"
+      }
     },
     "binary_sensor": {
-      "humidity_alarm": { "name": "Feuchtealarm" },
-      "filter_problem": { "name": "Filter prüfen" },
-      "night": { "name": "Nacht erkannt" },
-      "schedule": { "name": "Zeitplan" }
+      "humidity_alarm": {
+        "name": "Feuchtealarm"
+      },
+      "filter_problem": {
+        "name": "Filter prüfen"
+      },
+      "night": {
+        "name": "Nacht erkannt"
+      },
+      "schedule": {
+        "name": "Zeitplan"
+      },
+      "cloud_connection": {
+        "name": "Cloud-Verbindung"
+      },
+      "power": {
+        "name": "Eingeschaltet"
+      },
+      "power_cloud": {
+        "name": "Eingeschaltet (Cloud)"
+      },
+      "power_local": {
+        "name": "Eingeschaltet (lokal)"
+      },
+      "running": {
+        "name": "Läuft"
+      },
+      "running_cloud": {
+        "name": "Läuft (Cloud)"
+      },
+      "running_local": {
+        "name": "Läuft (lokal)"
+      },
+      "cloud_reachable": {
+        "name": "Cloud erreichbar"
+      },
+      "measurement_valid": {
+        "name": "Messung repräsentativ"
+      },
+      "outdoor_humidifies": {
+        "name": "Außenluft würde befeuchten"
+      },
+      "humidity_exhaust_active": {
+        "name": "Feuchte-Abluft aktiv"
+      },
+      "night_reduction_active": {
+        "name": "Nachtabsenkung aktiv"
+      },
+      "timed_exhaust_active": {
+        "name": "Zeitabluft aktiv"
+      },
+      "free_cooling_active": {
+        "name": "Freie Kühlung aktiv"
+      }
     },
     "select": {
-      "operating_mode": { "name": "Betriebsart", "state": { "smart": "Smart", "auto": "Automatik", "heat_recovery": "Wärmerückgewinnung", "night": "Nacht", "away": "Abwesend", "surveillance": "Überwachung", "timed_extraction": "Zeitgesteuerte Abluft", "extraction": "Abluft", "intake": "Zuluft", "master_slave_flow": "Master-zu-Slave-Luftstrom", "slave_master_flow": "Slave-zu-Master-Luftstrom", "off": "Aus" } },
-      "humidity_level": { "name": "Feuchteziel", "state": { "dry": "Trocken", "normal": "Normal", "moist": "Feucht" } },
-      "light_sensor_level": { "name": "Lichtsensor-Empfindlichkeit", "state": { "off": "Aus", "low": "Niedrig", "medium": "Mittel" } }
+      "operating_mode": {
+        "name": "Betriebsart",
+        "state": {
+          "smart": "Smart",
+          "auto": "Automatik",
+          "heat_recovery": "Wärmerückgewinnung",
+          "night": "Nacht",
+          "away": "Abwesend",
+          "surveillance": "Überwachung",
+          "timed_extraction": "Zeitgesteuerte Abluft",
+          "extraction": "Abluft",
+          "intake": "Zuluft",
+          "master_slave_flow": "Master-zu-Slave-Luftstrom",
+          "slave_master_flow": "Slave-zu-Master-Luftstrom",
+          "off": "Aus"
+        }
+      },
+      "humidity_level": {
+        "name": "Feuchteziel",
+        "state": {
+          "dry": "Trocken",
+          "normal": "Normal",
+          "moist": "Feucht"
+        }
+      },
+      "light_sensor_level": {
+        "name": "Lichtsensor-Empfindlichkeit",
+        "state": {
+          "off": "Aus",
+          "low": "Niedrig",
+          "medium": "Mittel"
+        }
+      }
     },
-    "switch": { "schedule": { "name": "Zeitplansteuerung" } },
-    "button": { "reset_filter": { "name": "Filterstatus zurücksetzen" } }
+    "switch": {
+      "schedule": {
+        "name": "Zeitplansteuerung"
+      }
+    },
+    "button": {
+      "reset_filter": {
+        "name": "Filterstatus zurücksetzen"
+      }
+    },
+    "calendar": {
+      "schedule": {
+        "name": "Zeitplan"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ambientika-Optionen",
+        "description": "Lege fest, wie oft die Ambientika-Cloud abgefragt wird. Das Gerät meldet etwa alle 30 Sekunden, kürzere Abstände bringen nichts. Nach einem Befehl fragt die Integration drei Minuten lang alle 30 Sekunden ab und wird bei einer nicht erreichbaren Cloud automatisch langsamer. Der lokale UDP-Empfang ergänzt Live-Werte aus den Broadcasts der Geräte in deinem Netzwerk. Die Außenquelle und die Filterbasis steuern die abgeleiteten Werte; der nächste Schritt fragt die Raumvolumen ab.",
+        "data": {
+          "scan_interval": "Abfrageintervall",
+          "local_udp": "Lokaler UDP-Empfang",
+          "raw_variants": "Rohquellen-Varianten erstellen",
+          "outdoor_weather": "Wetter-Entität (außen)",
+          "outdoor_temperature": "Außentemperatur-Sensor",
+          "outdoor_humidity": "Außenfeuchte-Sensor",
+          "filter_basis": "Zählung der Filterstunden"
+        },
+        "data_description": {
+          "scan_interval": "Sekunden zwischen den Cloud-Abfragen (30 bis 600).",
+          "local_udp": "Automatisch lauscht nach jedem Start bis zu 60 Sekunden und lauscht nur weiter, wenn deine Geräte gehört werden. Ein lauscht immer und meldet ein Problem, wenn nichts ankommt. Aus lauscht nie.",
+          "raw_variants": "Aktiviert die zusätzlichen Cloud- und lokalen Varianten von Eingeschaltet, Läuft und Zuletzt gesehen. Sie werden standardmäßig deaktiviert angelegt.",
+          "outdoor_weather": "Eine Wetter-Entität für Außentemperatur und -feuchte. Aktiviert Wärmerückgewinnung, Außentaupunkt und Trocknungspotenzial.",
+          "outdoor_temperature": "Optionaler Temperatursensor; ersetzt die Temperatur der Wetter-Entität.",
+          "outdoor_humidity": "Optionaler Feuchtesensor; ersetzt die Feuchte der Wetter-Entität.",
+          "filter_basis": "Betriebsstunden zählen nur, solange der Lüfter Luft bewegt; die Einschaltdauer zählt, solange das Gerät eingeschaltet ist."
+        }
+      },
+      "volumes": {
+        "title": "Raumvolumen",
+        "description": "Optional: Gib das Luftvolumen in m³ des Raums an, den jedes Gerät versorgt. Es wird für die Luftwechselrate verwendet. Ein leeres Feld überspringt das Gerät."
+      }
+    }
+  },
+  "services": {
+    "set_state": {
+      "name": "Zustand setzen",
+      "description": "Setzt Betriebsart, Lüfterstufe, Feuchteziel und Lichtsensor-Empfindlichkeit in einem Befehl. Nur die angegebenen Werte ändern sich.",
+      "fields": {
+        "operating_mode": {
+          "name": "Betriebsart",
+          "description": "Neue Betriebsart."
+        },
+        "fan_speed": {
+          "name": "Lüfterstufe",
+          "description": "Neue Lüfterstufe; nur in Betriebsarten mit wählbarer Stufe."
+        },
+        "humidity_level": {
+          "name": "Feuchteziel",
+          "description": "Neues Feuchteziel; nur in den Betriebsarten Automatik und Überwachung."
+        },
+        "light_sensor_level": {
+          "name": "Lichtsensor-Empfindlichkeit",
+          "description": "Neue Lichtsensor-Empfindlichkeit; nur in den Betriebsarten Smart und Automatik."
+        }
+      }
+    },
+    "set_time_slot": {
+      "name": "Zeitfenster setzen",
+      "description": "Legt ein wöchentliches Zeitfenster an oder ändert ein vorhandenes, wenn eine Kennung angegeben ist. Nicht angegebene Werte bleiben unverändert. Das Zeitfenster darf sich nicht mit einem anderen am selben Tag überschneiden.",
+      "fields": {
+        "slot_id": {
+          "name": "Zeitfenster",
+          "description": "Kennung eines vorhandenen Zeitfensters, das geändert wird. Leer lassen, um ein neues anzulegen. Mit Zeitplan abrufen lassen sich die Kennungen auflisten."
+        },
+        "day": {
+          "name": "Day",
+          "description": "Wochentag des Zeitfensters."
+        },
+        "start": {
+          "name": "Start",
+          "description": "Startzeit. Sekunden müssen null sein."
+        },
+        "end": {
+          "name": "Ende",
+          "description": "Endzeit am selben Tag, nach dem Start. Sekunden müssen null sein."
+        },
+        "operating_mode": {
+          "name": "Betriebsart",
+          "description": "Betriebsart des Zeitfensters."
+        },
+        "fan_speed": {
+          "name": "Lüfterstufe",
+          "description": "Lüfterstufe. Für ein neues Zeitfenster ist niedrig voreingestellt. Turbo nur, wenn das Gerät es erlaubt."
+        },
+        "humidity_level": {
+          "name": "Feuchteziel",
+          "description": "Feuchteziel. Für ein neues Zeitfenster ist normal voreingestellt."
+        },
+        "light_sensor_level": {
+          "name": "Lichtsensor-Empfindlichkeit",
+          "description": "Lichtsensor-Empfindlichkeit. Für ein neues Zeitfenster ist aus voreingestellt."
+        }
+      }
+    },
+    "delete_time_slot": {
+      "name": "Zeitfenster löschen",
+      "description": "Löscht ein wöchentliches Zeitfenster.",
+      "fields": {
+        "slot_id": {
+          "name": "Zeitfenster",
+          "description": "Kennung des zu löschenden Zeitfensters."
+        }
+      }
+    },
+    "clear_schedule": {
+      "name": "Zeitplan leeren",
+      "description": "Löscht alle wöchentlichen Zeitfenster des Geräts. Das lässt sich nicht rückgängig machen.",
+      "fields": {
+        "confirm": {
+          "name": "Bestätigen",
+          "description": "Muss eingeschaltet sein, um alle Zeitfenster zu löschen."
+        }
+      }
+    },
+    "get_schedule": {
+      "name": "Zeitplan abrufen",
+      "description": "Gibt die wöchentlichen Zeitfenster des Geräts mit ihren Kennungen zurück."
+    }
+  },
+  "selector": {
+    "local_udp": {
+      "options": {
+        "auto": "Automatisch (erkennen)",
+        "on": "Ein",
+        "off": "Aus"
+      }
+    },
+    "filter_basis": {
+      "options": {
+        "operating": "Betriebsstunden (Lüfter bewegt Luft)",
+        "on_time": "Einschaltdauer"
+      }
+    }
+  },
+  "issues": {
+    "local_udp_bind_failed": {
+      "title": "Lokaler UDP-Empfang kann nicht starten",
+      "description": "Die Integration konnte den lokalen UDP-Port bzw. die Ports {ports} nicht öffnen. Möglicherweise belegt ein anderes Programm sie bereits. Der lokale Empfang braucht die Broadcasts der Geräte im Netz von Home Assistant: Home Assistant OS und Supervised funktionieren direkt, ein Docker-Container braucht network_mode: host, und Geräte in einem anderen VLAN brauchen ein Interface von Home Assistant in diesem VLAN (unter Home Assistant OS: ha network vlan) oder ein Broadcast-Relay; Firewall-Regeln leiten keine Broadcasts weiter. Stelle die Option auf Aus oder Automatisch, wenn du keine lokalen Daten möchtest. Die Cloud-Daten funktionieren weiter."
+    },
+    "local_udp_no_frames": {
+      "title": "Keine lokalen Broadcasts empfangen",
+      "description": "Der lokale UDP-Empfang ist eingeschaltet und lauscht auf Port bzw. Ports {ports}, aber seit mehreren Minuten kam kein Broadcast deiner Geräte an. Der lokale Empfang braucht die Broadcasts im Netz von Home Assistant: Home Assistant OS und Supervised funktionieren direkt, ein Docker-Container braucht network_mode: host, und Geräte in einem anderen VLAN brauchen ein Interface von Home Assistant in diesem VLAN (unter Home Assistant OS: ha network vlan) oder ein Broadcast-Relay; Firewall-Regeln leiten keine Broadcasts weiter. Dieses Problem verschwindet von selbst, sobald Frames ankommen. Die Cloud-Daten funktionieren weiter."
+    }
   }
 }

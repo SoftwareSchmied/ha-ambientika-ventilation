@@ -40,7 +40,9 @@ After that extraction, a Core contribution also requires:
 1. moving the integration and tests into `home-assistant/core`;
 2. removing the custom-integration `version` and `issue_tracker` manifest keys;
 3. adding the pinned client package to `requirements_all.txt`;
-4. adding `quality_scale.yaml` with links or justified exemptions;
+4. completing `quality_scale.yaml` (shipped with an honest status per rule;
+   the remaining `todo` items are listed there) with links or justified
+   exemptions;
 5. submitting user documentation to `home-assistant.io`;
 6. submitting the icon to `home-assistant/brands` and removing local brand files;
 7. passing the full Core test, hassfest, typing, and review suite.

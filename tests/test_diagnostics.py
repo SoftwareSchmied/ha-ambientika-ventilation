@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections import deque
+from datetime import timedelta
 from types import SimpleNamespace
 
 from custom_components.ambientika_ventilation.api import RequestMetrics
 from custom_components.ambientika_ventilation.diagnostics import (
     async_get_config_entry_diagnostics,
 )
+from custom_components.ambientika_ventilation.hub import AmbientikaHub
 from custom_components.ambientika_ventilation.models import (
     AmbientikaData,
     AmbientikaDevice,
@@ -41,11 +44,22 @@ async def test_diagnostics_redact_credentials_and_identifiers(hass) -> None:
         last_successful_update=None,
         last_update_duration_ms=10,
         last_partial_failures=0,
+        update_interval=timedelta(seconds=60),
+        base_interval=timedelta(seconds=60),
+        consecutive_failures=0,
+        cycle_durations_ms=deque([10, 12]),
+        discarded_polls=0,
+        device_changes=0,
     )
     entry = SimpleNamespace(
         runtime_data=SimpleNamespace(
             coordinator=coordinator,
-            api=SimpleNamespace(metrics=RequestMetrics()),
+            api=SimpleNamespace(
+                metrics=RequestMetrics(), token_expires_at="2027-01-01T00:00:00+00:00"
+            ),
+            hub=AmbientikaHub(),
+            local=SimpleNamespace(diagnostics=lambda: {"mode": "auto"}),
+            analytics=SimpleNamespace(diagnostics=lambda: {"units": 0}),
         ),
         version=1,
         minor_version=1,
@@ -66,6 +80,9 @@ async def test_diagnostics_redact_credentials_and_identifiers(hass) -> None:
     assert result["coordinator"]["next_discovery_attempt"] is None
     assert result["coordinator"]["offline_devices"] == []
     assert result["coordinator"]["offline_transitions"] == 0
+    assert result["coordinator"]["poll_interval_s"] == 60
+    assert result["coordinator"]["cycle_durations_ms"] == [10, 12]
+    assert result["token"]["expires_at"] == "2027-01-01T00:00:00+00:00"
 
     coordinator.offline_devices = {serial}
     coordinator.offline_transitions = 2

@@ -8,16 +8,38 @@ from typing import Final
 from homeassistant.const import Platform
 
 DOMAIN: Final = "ambientika_ventilation"
-INTEGRATION_VERSION: Final = "0.9.3"
+INTEGRATION_VERSION: Final = "1.0.0-beta.1"
 DEFAULT_BASE_URL: Final = "https://app.ambientika.eu:4521"
 DEFAULT_SCAN_INTERVAL: Final = timedelta(seconds=60)
 DISCOVERY_INTERVAL: Final = timedelta(hours=6)
-REQUEST_TIMEOUT: Final = 20
+# Devices missing from this many consecutive successful discoveries (every six
+# hours) and for at least the minimum age are removed from the registry.
+STALE_DEVICE_DISCOVERIES: Final = 4
+STALE_DEVICE_MIN_AGE: Final = timedelta(hours=24)
+REQUEST_TIMEOUT: Final = 10
+CONNECT_TIMEOUT: Final = 5
+# Idle connections are kept slightly shorter than the cloud's ~130 s so that
+# the next poll reuses the TLS connection instead of opening a new one.
+KEEPALIVE_TIMEOUT: Final = 120
 MAX_CONCURRENT_REQUESTS: Final = 3
+MAX_CONCURRENT_COMMANDS: Final = 2
+
+CONF_SCAN_INTERVAL: Final = "scan_interval"
+MIN_SCAN_INTERVAL: Final = 30
+MAX_SCAN_INTERVAL: Final = 600
+# After a command or a change the cloud is polled at the minimum interval for a
+# while, because the device uploads a status packet about every 30 s.
+FAST_POLL_DURATION: Final = timedelta(minutes=3)
+# Consecutive failed polls stretch the interval up to this limit.
+MAX_BACKOFF_INTERVAL: Final = timedelta(minutes=10)
+TOKEN_RENEW_BEFORE: Final = timedelta(days=30)
+TOKEN_CHECK_INTERVAL: Final = timedelta(days=1)
+EVENT_DEVICE_CHANGED: Final = f"{DOMAIN}_device_changed"
 
 CONF_BASE_URL: Final = "base_url"
 CONF_EXPIRES_AT: Final = "expires_at"
 CONF_TOKEN: Final = "token"
+CONF_TOKEN_ONLY: Final = "token_only"
 CONF_USER_ID: Final = "user_id"
 
 PLATFORMS: Final = (
@@ -27,6 +49,7 @@ PLATFORMS: Final = (
     Platform.SELECT,
     Platform.SWITCH,
     Platform.BUTTON,
+    Platform.CALENDAR,
 )
 
 OPERATING_MODES: Final = (
@@ -55,6 +78,9 @@ GEMINI_OPERATING_MODES: Final = (
     "Intake",
     "Off",
 )
+# Legacy firmware may still report the retired "Turbo" mode (numeric 12). It is
+# shown read-only and never written.
+REPORTED_OPERATING_MODES: Final = (*OPERATING_MODES, "Turbo")
 USER_OPERATING_MODES: Final = OPERATING_MODES[:-1]
 FAN_SPEEDS: Final = ("Low", "Medium", "High", "Night", "Turbo")
 WRITABLE_FAN_SPEEDS: Final = ("Low", "Medium", "High", "Turbo")
@@ -122,3 +148,59 @@ def operating_modes_for_device(device_type: str | None) -> tuple[str, ...]:
 def mode_allows_setting(mode: str | None, field: str) -> bool:
     """Return whether the official app enables a setting in a mode."""
     return field in MODE_WRITABLE_FIELDS.get(mode or "", frozenset())
+
+
+# --- Hybrid cloud + local data model ---------------------------------------
+
+CONF_LOCAL_UDP: Final = "local_udp"
+CONF_RAW_VARIANTS: Final = "raw_variants"
+LOCAL_UDP_AUTO: Final = "auto"
+LOCAL_UDP_ON: Final = "on"
+LOCAL_UDP_OFF: Final = "off"
+LOCAL_UDP_MODES: Final = (LOCAL_UDP_AUTO, LOCAL_UDP_ON, LOCAL_UDP_OFF)
+DEFAULT_LOCAL_UDP: Final = LOCAL_UDP_AUTO
+DEFAULT_RAW_VARIANTS: Final = False
+
+# The cloud value stays usable for 2.5 scan intervals, at least 150 s.
+CLOUD_TTL_FACTOR: Final = 2.5
+MIN_CLOUD_TTL: Final = 150.0
+# The auto mode listens this long for the account's own broadcasts.
+PROBE_DURATION: Final = 60.0
+# A listener that hears nothing for this long raises a repair issue ("on").
+NO_FRAMES_AFTER: Final = 300.0
+# A UDP-driven change asks the cloud for confirmation at most this often.
+UDP_REFRESH_MIN_INTERVAL: Final = 30.0
+# Volatile diagnostics (heartbeat age, last seen) are written at most this often.
+THROTTLE_INTERVAL: Final = timedelta(seconds=60)
+
+STORE_VERSION: Final = 1
+STORE_KEY_PREFIX: Final = f"{DOMAIN}"
+ISSUE_LOCAL_UDP_BIND: Final = "local_udp_bind_failed"
+ISSUE_LOCAL_UDP_NO_FRAMES: Final = "local_udp_no_frames"
+
+# Identifier prefix of the account-level cloud device (not a unit serial).
+CLOUD_DEVICE_PREFIX: Final = "cloud_"
+
+# --- Derived data -----------------------------------------------------------
+
+CONF_OUTDOOR_WEATHER: Final = "outdoor_weather"
+CONF_OUTDOOR_TEMPERATURE: Final = "outdoor_temperature"
+CONF_OUTDOOR_HUMIDITY: Final = "outdoor_humidity"
+CONF_ROOM_VOLUMES: Final = "room_volumes"
+CONF_FILTER_BASIS: Final = "filter_basis"
+FILTER_BASIS_OPERATING: Final = "operating"
+FILTER_BASIS_ON_TIME: Final = "on_time"
+FILTER_BASES: Final = (FILTER_BASIS_OPERATING, FILTER_BASIS_ON_TIME)
+DEFAULT_FILTER_BASIS: Final = FILTER_BASIS_OPERATING
+MAX_ROOM_VOLUME: Final = 1000.0
+"""Upper bound (m3) accepted for the room volume of one unit."""
+
+ANALYTICS_STORE_KEY_PREFIX: Final = f"{DOMAIN}.analytics"
+ANALYTICS_STORE_VERSION: Final = 1
+ANALYTICS_SAVE_DELAY: Final = 300.0
+"""Seconds between two writes of the counters while the entry runs."""
+ANALYTICS_TICK: Final = timedelta(seconds=60)
+"""Period of the derived-data timer while any unit runs."""
+
+# Identifier prefix of the house devices (derived data of one installation).
+HOUSE_DEVICE_PREFIX: Final = "house_"

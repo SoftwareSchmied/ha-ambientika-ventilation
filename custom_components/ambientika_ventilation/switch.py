@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import AmbientikaRuntimeData
+from .coordinator import AmbientikaCoordinator
 from .entity import AmbientikaEntity
 from .models import is_controllable_device
 
@@ -41,7 +42,7 @@ async def async_setup_entry(
             known.update(serials)
 
     add_new_entities()
-    entry.async_on_unload(coordinator.async_add_listener(add_new_entities))
+    entry.async_on_unload(coordinator.async_add_topology_listener(add_new_entities))
 
 
 class AmbientikaScheduleSwitch(AmbientikaEntity, SwitchEntity):
@@ -49,7 +50,7 @@ class AmbientikaScheduleSwitch(AmbientikaEntity, SwitchEntity):
 
     _attr_translation_key = "schedule"
 
-    def __init__(self, coordinator: Any, serial: str) -> None:
+    def __init__(self, coordinator: AmbientikaCoordinator, serial: str) -> None:
         """Initialize the schedule switch."""
         super().__init__(coordinator, serial, "schedule_control")
 
