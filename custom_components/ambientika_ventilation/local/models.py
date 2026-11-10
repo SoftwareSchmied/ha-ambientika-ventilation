@@ -116,3 +116,9 @@ class LocalZoneState:
     """Direction changes exhaust <-> intake (heat recovery cycles x 2)."""
     rejected: int
     """Frames for this zone rejected by plausibility or spoofing checks."""
+    running_speed: LocalSpeed | None = None
+    """Stage of the last frame that moved air since the zone left idle.
+
+    A stopped frame (start-up or the ~10 s reversal) still carries a stage
+    byte, which during start-up is a leftover; this keeps the real one.
+    """

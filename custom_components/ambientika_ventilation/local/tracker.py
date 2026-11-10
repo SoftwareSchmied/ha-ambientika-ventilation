@@ -12,6 +12,7 @@ from .decoder import RejectReason
 from .models import (
     LOCAL_LOST_AFTER,
     LOCAL_STALE_AFTER,
+    Coupling,
     Direction,
     Freshness,
     LocalZoneState,
@@ -166,11 +167,15 @@ class UdpZoneTracker:
         entry.histogram[frame.state_raw] += 1
         heartbeat = previous.frame is not None and previous.frame.raw == frame.raw
         reversal = False
+        running_speed = previous.running_speed
         if frame.running:
             reversal = (
                 entry.last_running is not None and entry.last_running != frame.direction
             )
             entry.last_running = frame.direction
+            running_speed = frame.speed
+        elif frame.coupling is Coupling.IDLE:
+            running_speed = None
         entry.state = replace(
             previous,
             frame=frame,
@@ -182,6 +187,7 @@ class UdpZoneTracker:
             heartbeats=previous.heartbeats + (1 if heartbeat else 0),
             changes=previous.changes + (0 if heartbeat else 1),
             reversals=previous.reversals + (1 if reversal else 0),
+            running_speed=running_speed,
         )
         return ProcessResult(
             state=entry.state,

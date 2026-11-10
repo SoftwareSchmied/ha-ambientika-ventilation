@@ -928,7 +928,8 @@ class AnalyticsEngine:
         elif phase == "running":
             moment.flow_fraction = CYCLE_DUTY if cyclic else 1.0
 
-        if ventilating is False:
+        if ventilating is False or phase == "reversing":
+            # Stopped while coupled (start-up or the ~10 s reversal): no air moves.
             moment.airflow = 0.0
             moment.fresh = 0.0
         elif ventilating and stage is not None:
@@ -936,7 +937,7 @@ class AnalyticsEngine:
             if moment.airflow is not None:
                 moment.fresh = moment.airflow * (cfg.supply_share if cyclic else 1.0)
         # power
-        if ventilating is False:
+        if ventilating is False or phase == "reversing":
             moment.power_w = cfg.standby_w
         elif ventilating and stage is not None and stage in cfg.power_w:
             moment.power_w = cfg.power_w[stage] * cfg.power_scale

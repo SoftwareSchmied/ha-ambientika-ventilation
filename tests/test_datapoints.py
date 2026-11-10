@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from custom_components.ambientika_ventilation.datapoints import (
     DATAPOINTS,
@@ -152,9 +154,13 @@ def test_local_running_and_physical_values() -> None:
     assert stage(inputs(local=view(Coupling.IDLE, Direction.STOPPED))) is None
     assert stage(inputs(local=view(Coupling.IDLE, Direction.UNKNOWN))) is None
     assert stage(inputs(local=view(Coupling.IDLE, Direction.EXHAUST))) is LocalSpeed.LOW
-    assert stage(inputs(local=view(Coupling.OPPOSITE, Direction.STOPPED))) is (
-        LocalSpeed.LOW
+    # Stopped while coupled: the reversal keeps the stage of the last running
+    # frame; at start-up nothing has run yet, so the leftover stage is hidden.
+    assert stage(inputs(local=view(Coupling.OPPOSITE, Direction.STOPPED))) is None
+    reversing = replace(
+        view(Coupling.OPPOSITE, Direction.STOPPED), running_speed=LocalSpeed.MEDIUM
     )
+    assert stage(inputs(local=reversing)) is LocalSpeed.MEDIUM
     assert stage(inputs()) is None
     assert DATAPOINTS["direction"].stale_value is Direction.UNKNOWN
     assert DATAPOINTS["coupling"].stale_value is Coupling.UNKNOWN

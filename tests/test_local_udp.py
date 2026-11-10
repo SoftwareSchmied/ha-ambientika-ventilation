@@ -247,3 +247,21 @@ def test_default_wall_clock() -> None:
     tracker = UdpZoneTracker(HOUSE, [0], clock=lambda: 1.0)
     result = tracker.process(frame())
     assert result.state is not None and result.state.received_wall is not None
+
+
+def test_tracker_keeps_the_running_stage_through_stops(
+    tracker: UdpZoneTracker, clock: Clock
+) -> None:
+    """Start-up frames carry a leftover stage; reversals keep the real one."""
+    # start-up: coupled, stopped, leftover stage night
+    state = tracker.process(frame(state=0x20)).state
+    assert state is not None and state.running_speed is None
+    clock.now += 30
+    state = tracker.process(frame(state=0x29)).state  # intake, low
+    assert state is not None and state.running_speed is LocalSpeed.LOW
+    clock.now += 30
+    state = tracker.process(frame(state=0x21)).state  # reversing, stage low
+    assert state is not None and state.running_speed is LocalSpeed.LOW
+    clock.now += 30
+    state = tracker.process(frame(state=0x01)).state  # idle coupling: off
+    assert state is not None and state.running_speed is None

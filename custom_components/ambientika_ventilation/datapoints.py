@@ -123,6 +123,8 @@ class LocalView:
     speed: LocalSpeed
     derived: bool
     """True for values derived from the master (slaves)."""
+    running_speed: LocalSpeed | None = None
+    """Stage of the last air-moving frame since the zone left idle."""
 
     @property
     def fresh(self) -> bool:
@@ -244,9 +246,13 @@ def _local_stage(inp: DatapointInputs) -> LocalSpeed | None:
     local = inp.local
     if local is None:
         return None
-    if local.coupling is Coupling.IDLE and not local.running:
+    if local.running:
+        return local.speed
+    if local.coupling is Coupling.IDLE:
         return None
-    return local.speed
+    # Stopped while coupled: the ~10 s reversal keeps the real stage; during
+    # start-up the frame carries a leftover stage, so no stage is known yet.
+    return local.running_speed
 
 
 def _local_running(inp: DatapointInputs) -> bool | None:

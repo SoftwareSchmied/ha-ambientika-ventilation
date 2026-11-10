@@ -590,6 +590,7 @@ class AmbientikaHub:
             direction=derive_direction(entry.role, frame.coupling, frame.direction),
             speed=frame.speed,
             derived=entry.role in SLAVE_ROLES,
+            running_speed=state.running_speed,
         )
 
     def _context(self, serial: str, now: float) -> _Context | None:

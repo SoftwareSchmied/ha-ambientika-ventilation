@@ -857,3 +857,16 @@ def test_import_ignores_garbage(engine: AnalyticsEngine, clock: Clock) -> None:
     assert exported["filter_reset"] is None
     assert exported["today"] is None
     assert val(step(engine, clock, snap()), "operating_hours") == 0.0
+
+
+def test_stopped_while_coupled_moves_no_air(
+    engine: AnalyticsEngine, clock: Clock
+) -> None:
+    """Start-up and the ~10 s reversal stop the fan: no airflow, standby power."""
+    values = step(
+        engine,
+        clock,
+        snap(direction="stopped", running=False, physical_stage=None),
+    ).values
+    assert values["airflow"] == 0
+    assert values["power_estimate"] == 0.5
