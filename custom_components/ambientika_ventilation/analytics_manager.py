@@ -192,6 +192,7 @@ class AmbientikaAnalytics:
         self._pending: dict[str, dict[int, _Pending]] = {}
         self._active = False
         self._save_pending = False
+        self._poll_refreshed = False
         self.updates = 0
 
     # ------------------------------------------------------------------ setup
@@ -203,6 +204,7 @@ class AmbientikaAnalytics:
     def attach(self) -> Callable[[], None]:
         """Follow coordinator, local changes, the timer and the outdoor entities."""
         unsubscribers = [
+            self._coordinator.async_add_poll_listener(self._on_poll),
             self._coordinator.async_add_listener(self._on_coordinator),
             self._local.add_change_listener(self._on_local_change),
             async_track_time_interval(self._hass, self._on_tick, ANALYTICS_TICK),
@@ -426,8 +428,21 @@ class AmbientikaAnalytics:
             self._publish(f"house:{house}", derived.values, derived.changed)
 
     @callback
-    def _on_coordinator(self) -> None:
+    def _on_poll(self) -> None:
+        """Update after a poll, changed or not."""
         self.refresh()
+        self._poll_refreshed = True
+        self._hass.loop.call_soon(self._end_poll)
+
+    @callback
+    def _end_poll(self) -> None:
+        self._poll_refreshed = False
+
+    @callback
+    def _on_coordinator(self) -> None:
+        """Update after a change of the coordinator data (poll or command)."""
+        if not self._poll_refreshed:
+            self.refresh()
 
     @callback
     def _on_local_change(self, serials: tuple[str, ...]) -> None:
@@ -468,6 +483,8 @@ class AmbientikaAnalytics:
         state = self._hass.states.get(entity_id)
         if state is None or state.state.lower() in _UNAVAILABLE:
             return None
+        value: Any
+        unit: str | None
         if attribute is None:
             value = state.state
             unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
@@ -553,7 +570,7 @@ class AmbientikaAnalytics:
             return False
         coupling = self._hub.resolve(serial, "coupling").value
         if mode == "Off":
-            return coupling == Coupling.IDLE
+            return bool(coupling == Coupling.IDLE)
         power = self._hub.resolve(serial, "power").variants.get(Source.LOCAL_UDP)
         if power is not True:
             return False

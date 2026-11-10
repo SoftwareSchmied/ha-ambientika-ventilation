@@ -555,6 +555,7 @@ async def test_config_entry_diagnostics_include_token_and_poll_history(hass) -> 
             api=SimpleNamespace(metrics=metrics, token_expires_at="2027-02-18"),
             hub=AmbientikaHub(),
             local=SimpleNamespace(diagnostics=lambda: {"mode": "auto"}),
+            analytics=SimpleNamespace(diagnostics=lambda: {"units": 0}),
         ),
         version=1,
         minor_version=1,

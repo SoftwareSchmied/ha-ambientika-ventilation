@@ -212,7 +212,10 @@ async def test_effective_entities_exist_and_variants_are_disabled(hass, cloud) -
         entity_id(hass, "sensor", f"{MASTER}_last_seen_local")
     )
     assert last_local is not None and last_local.disabled_by is None
-    assert registry.async_get_entity_id("sensor", DOMAIN, f"{MASTER}_last_local_frame") is None
+    assert (
+        registry.async_get_entity_id("sensor", DOMAIN, f"{MASTER}_last_local_frame")
+        is None
+    )
     heartbeat = registry.async_get(entity_id(hass, "sensor", f"{MASTER}_heartbeat_age"))
     assert heartbeat is not None
     assert heartbeat.disabled_by is er.RegistryEntryDisabler.INTEGRATION

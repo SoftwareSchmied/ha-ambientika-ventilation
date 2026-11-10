@@ -59,6 +59,7 @@ async def test_diagnostics_redact_credentials_and_identifiers(hass) -> None:
             ),
             hub=AmbientikaHub(),
             local=SimpleNamespace(diagnostics=lambda: {"mode": "auto"}),
+            analytics=SimpleNamespace(diagnostics=lambda: {"units": 0}),
         ),
         version=1,
         minor_version=1,

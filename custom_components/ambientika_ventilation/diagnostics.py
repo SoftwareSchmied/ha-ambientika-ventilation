@@ -144,6 +144,7 @@ async def async_get_config_entry_diagnostics(
         "request_metrics": runtime.api.metrics.as_dict(),
         "hub": _hub_diagnostics(runtime.hub),
         "local_udp": runtime.local.diagnostics(),
+        "analytics": runtime.analytics.diagnostics(),
         "devices": devices,
     }
 

@@ -242,6 +242,8 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         self._topology: object = None
         self._topology_listeners: dict[int, CALLBACK_TYPE] = {}
         self._topology_listener_id = 0
+        self._poll_listeners: dict[int, CALLBACK_TYPE] = {}
+        self._poll_listener_id = 0
         self.hub: AmbientikaHub | None = None
         """Hybrid data hub, set by the setup before the first refresh."""
         self.command_observer: CommandObserver | None = None
@@ -287,6 +289,34 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             self._topology_listeners.pop(listener_id, None)
 
         return remove
+
+    @callback
+    def async_add_poll_listener(self, poll_callback: CALLBACK_TYPE) -> CALLBACK_TYPE:
+        """Call back after every successful poll, also when nothing changed.
+
+        The regular listeners only run when the data changed
+        (``always_update=False``); the derived data needs every poll.
+        """
+        self._poll_listener_id += 1
+        listener_id = self._poll_listener_id
+        self._poll_listeners[listener_id] = poll_callback
+
+        @callback
+        def remove() -> None:
+            self._poll_listeners.pop(listener_id, None)
+
+        return remove
+
+    @callback
+    def _async_refresh_finished(self) -> None:
+        """Notify the poll listeners; runs just before the regular listeners."""
+        if not self.last_update_success:
+            return
+        for poll_callback in list(self._poll_listeners.values()):
+            try:
+                poll_callback()
+            except Exception:
+                LOGGER.exception("Poll listener failed")
 
     @callback
     def async_update_listeners(self) -> None:
