@@ -14,6 +14,14 @@ def auto_enable_custom_integrations(enable_custom_integrations: Any) -> None:
     """Enable custom integrations for all tests."""
 
 
+@pytest.fixture(autouse=True)
+def instant_read_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Skip the real delay before reading a device back after a command."""
+    monkeypatch.setattr(
+        "custom_components.ambientika_ventilation.coordinator.READBACK_DELAY", 0
+    )
+
+
 @pytest.fixture
 def houses_payload() -> list[dict[str, Any]]:
     """Return a representative multi-device account payload."""

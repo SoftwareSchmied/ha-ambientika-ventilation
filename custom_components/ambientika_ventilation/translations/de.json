@@ -25,6 +25,18 @@
           "username": "E-Mail-Adresse, die in der Ambientika-App registriert ist.",
           "password": "Aktuelles Passwort des Ambientika-Cloud-Kontos."
         }
+      },
+      "reconfigure": {
+        "title": "Ambientika-Zugangsdaten aktualisieren",
+        "description": "Gib die aktuellen Zugangsdaten desselben Ambientika-Kontos ein.",
+        "data": {
+          "username": "E-Mail-Adresse",
+          "password": "Passwort"
+        },
+        "data_description": {
+          "username": "E-Mail-Adresse, die in der Ambientika-App registriert ist.",
+          "password": "Aktuelles Passwort des Ambientika-Cloud-Kontos."
+        }
       }
     },
     "error": {
@@ -37,7 +49,8 @@
     },
     "abort": {
       "already_configured": "Dieses Ambientika-Konto ist bereits eingerichtet",
-      "reauth_successful": "Die Anmeldung wurde erfolgreich erneuert"
+      "reauth_successful": "Die Anmeldung wurde erfolgreich erneuert",
+      "reconfigure_successful": "Die Zugangsdaten wurden erfolgreich aktualisiert"
     }
   },
   "exceptions": {
@@ -53,7 +66,9 @@
     "filter_reset_failed": { "message": "Der Filterstatus konnte über die Ambientika-Cloud nicht zurückgesetzt werden." },
     "unsupported_preset_mode": { "message": "Die Lüfter-Voreinstellung {preset} wird nicht unterstützt." },
     "invalid_fan_percentage": { "message": "Der Lüfterwert muss zwischen 1 und 100 Prozent liegen." },
-    "unsupported_select_option": { "message": "Die Option {option} wird nicht unterstützt." }
+    "unsupported_select_option": { "message": "Die Option {option} wird nicht unterstützt." },
+    "device_offline": { "message": "Das Lüftungsgerät hat nicht auf den Befehl reagiert. Prüfe in der Ambientika-App, ob es online ist." },
+    "auth_failed": { "message": "Die Ambientika-Cloud hat die gespeicherten Zugangsdaten abgelehnt. Melde die Integration erneut an." }
   },
   "entity": {
     "fan": { "ventilation": { "name": "Lüftung", "state_attributes": { "preset_mode": { "state": { "night": "Nacht" } } } } },

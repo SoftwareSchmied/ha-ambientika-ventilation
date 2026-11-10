@@ -276,3 +276,90 @@ async def test_reauthentication_rejects_different_account(hass) -> None:
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "wrong_account"}
+
+
+def reconfigure_entry(hass) -> MockConfigEntry:
+    """Return an existing account entry for reconfiguration tests."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="ambientika_ventilation_42",
+        data={
+            CONF_USERNAME: "old@example.com",
+            CONF_PASSWORD: "old-password",
+            CONF_USER_ID: 42,
+        },
+    )
+    entry.add_to_hass(hass)
+    return entry
+
+
+async def test_reconfigure_updates_credentials(hass) -> None:
+    """Reconfiguration replaces credentials of the same account and reloads."""
+    entry = reconfigure_entry(hass)
+    new_data = {
+        CONF_USERNAME: "new@example.com",
+        CONF_PASSWORD: "new-password",
+        CONF_USER_ID: 42,
+        "token": "renewed",
+    }
+    with (
+        patch(
+            "custom_components.ambientika_ventilation.config_flow._validate_input",
+            return_value=new_data,
+        ),
+        patch(
+            "custom_components.ambientika_ventilation.async_setup_entry",
+            new=AsyncMock(return_value=True),
+        ),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={
+                "source": config_entries.SOURCE_RECONFIGURE,
+                "entry_id": entry.entry_id,
+            },
+        )
+        assert result["type"] is FlowResultType.FORM
+        assert result["step_id"] == "reconfigure"
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_USERNAME: "new@example.com", CONF_PASSWORD: "new-password"},
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_USERNAME] == "new@example.com"
+    assert entry.data["token"] == "renewed"
+
+
+@pytest.mark.parametrize(
+    ("validation", "error_key"),
+    [
+        ({"return_value": {CONF_USER_ID: 7}}, "wrong_account"),
+        ({"side_effect": AmbientikaAuthError()}, "invalid_auth"),
+        ({"side_effect": AmbientikaApiError()}, "cannot_connect"),
+    ],
+)
+async def test_reconfigure_errors(hass, validation, error_key) -> None:
+    """Reconfiguration rejects other accounts and maps validation errors."""
+    entry = reconfigure_entry(hass)
+    with patch(
+        "custom_components.ambientika_ventilation.config_flow._validate_input",
+        **validation,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={
+                "source": config_entries.SOURCE_RECONFIGURE,
+                "entry_id": entry.entry_id,
+            },
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_USERNAME: "other@example.com", CONF_PASSWORD: "password"},
+        )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": error_key}
+    assert entry.data[CONF_USERNAME] == "old@example.com"

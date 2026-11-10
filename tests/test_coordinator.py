@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from custom_components.ambientika_ventilation.api import (
@@ -495,5 +495,10 @@ async def test_filter_reset_updates_data_and_auth_failure_reauthenticates(hass) 
     assert coordinator.data.devices["serial"].status.filter_status == "Good"
 
     api.async_reset_filter.side_effect = AmbientikaAuthError
-    with pytest.raises(ConfigEntryAuthFailed):
+    with (
+        patch.object(coordinator.config_entry, "async_start_reauth") as start_reauth,
+        pytest.raises(HomeAssistantError) as error,
+    ):
         await coordinator.async_reset_filter("serial")
+    assert error.value.translation_key == "auth_failed"
+    start_reauth.assert_called_once_with(hass)

@@ -99,11 +99,26 @@ async def test_authentication_and_token_callback() -> None:
 
 @pytest.mark.asyncio
 async def test_invalid_credentials_raise_auth_error() -> None:
-    """A login HTTP 400 is classified as invalid authentication."""
-    client = make_client([FakeResponse(400)], authenticated=False)
+    """A login HTTP 401 is classified as invalid authentication."""
+    client = make_client(
+        [FakeResponse(401, {"message": "Username or password is incorrect"})],
+        authenticated=False,
+    )
 
     with pytest.raises(AmbientikaAuthError):
         await client.async_authenticate()
+
+
+@pytest.mark.asyncio
+async def test_login_validation_error_is_not_an_auth_error() -> None:
+    """An unauthenticated HTTP 400 is a validation problem, not bad credentials."""
+    client = make_client([FakeResponse(400)], authenticated=False)
+
+    with pytest.raises(AmbientikaResponseError) as error:
+        await client.async_authenticate()
+
+    assert not isinstance(error.value, AmbientikaAuthError)
+    assert error.value.status == 400
 
 
 @pytest.mark.asyncio

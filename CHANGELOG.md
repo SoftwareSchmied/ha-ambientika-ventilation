@@ -6,6 +6,44 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-11-10
+
+- Fix commands failing while a unit reports the automatic `Night` fan speed,
+  including turning off and changing the humidity target, light sensitivity,
+  or schedule control. Reported values the cloud does not accept are replaced
+  by the unit's last writable value, falling back to `Low` for the fan speed
+  and `Normal` for the humidity target. Unknown values are never written back.
+- Report a unit that does not acknowledge a command (HTTP 406) as offline
+  instead of as a generic cloud error. Removed devices, deleted houses, houses
+  without a master, and missing schedules are now distinguished, and devices
+  are rediscovered early when a house or device disappears. A validation error
+  during login is no longer reported as invalid credentials.
+- Detect powered-off units: when the cloud has no current status packet
+  (HTTP 404 "Status packet not found!"), the unit's entities become
+  unavailable, it keeps being polled every minute, and it recovers on the next
+  poll after reconnecting. Going offline and coming back are each logged once
+  and counted in diagnostics.
+- Show the actual result of a command: the state is read back after 3 s,
+  retried once after another 3 s, and otherwise the written values are shown
+  until the next poll, instead of the stale state the cloud returns right
+  after a command. A failed read-back no longer reports an accepted command as
+  failed. The cloud also accepts commands for powered-off units, so a
+  successful command does not prove delivery.
+- Start reauthentication when a command fails because the cloud rejected the
+  stored credentials.
+- Name the cause of polling failures (timeout, transport error, HTTP status,
+  cloud trace ID) in the single outage log entry and in diagnostics, with
+  counters per failure kind. Serial numbers remain masked.
+- Reduce cloud load during outages. A failed discovery is retried after 5, 10,
+  and 30 minutes, up to six hours, instead of every minute. A failed house
+  status request triggers at most one individual device probe per house.
+- Add a reconfiguration flow for updating the account credentials, as already
+  referenced in the troubleshooting section.
+- The error responses, the offline behavior of a powered-off unit, and the
+  command delay were checked against a live installation. The `Night`
+  handling follows the official app and has not yet been observed on a unit
+  at night.
+
 ## [0.9.2] - 2026-10-20
 
 - Add read-only sensor and binary-sensor readings for configured slave devices
