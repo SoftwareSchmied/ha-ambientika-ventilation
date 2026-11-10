@@ -350,7 +350,7 @@ def test_cloud_variant_change_notifies_even_if_effective_is_local() -> None:
     assert seen[0].variants[Source.CLOUD] is False
 
 
-def test_volatile_notifies_on_availability_and_source_only() -> None:
+def test_volatile_notifies_on_availability_only() -> None:
     hub, clock = start()
     ages: list[ResolvedValue] = []
     seen: list[ResolvedValue] = []
@@ -366,6 +366,10 @@ def test_volatile_notifies_on_availability_and_source_only() -> None:
     clock.advance(100)
     hub.evaluate()  # stale, still reports the age
     assert hub.resolve(MASTER, "heartbeat_age").value == 100.0
+    assert (len(ages), len(seen)) == before
+    # A newer cloud poll flips the source of the latest timestamp: no notification.
+    hub.update_cloud(cloud(device()))
+    assert hub.resolve(MASTER, "last_seen").source is Source.CLOUD
     assert (len(ages), len(seen)) == before
 
 
