@@ -243,8 +243,10 @@ async def test_set_state_action_is_registered_with_a_schema(hass, fan_platform) 
 
     await setup_fans(hass, entry, MagicMock())
 
-    name, schema, method = fan_platform.async_register_entity_service.call_args.args
+    name, fields, method = fan_platform.async_register_entity_service.call_args.args
     assert (name, method) == ("set_state", "async_set_state")
+    # Home Assistant wraps the field dict into an entity service schema.
+    schema = vol.Schema(fields)
     assert schema({"fan_speed": "high"}) == {"fan_speed": "high"}
     assert SET_STATE_SCHEMA({}) == {}
     with pytest.raises(vol.Invalid):

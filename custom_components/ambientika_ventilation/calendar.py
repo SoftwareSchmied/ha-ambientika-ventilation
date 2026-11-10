@@ -100,13 +100,15 @@ async def async_setup_entry(
 
     platform = entity_platform.async_get_current_platform()
     platform.async_register_entity_service(
-        SERVICE_SET_TIME_SLOT, SET_TIME_SLOT_SCHEMA, "async_set_time_slot"
+        SERVICE_SET_TIME_SLOT, SET_TIME_SLOT_SCHEMA.schema, "async_set_time_slot"
     )
     platform.async_register_entity_service(
-        SERVICE_DELETE_TIME_SLOT, DELETE_TIME_SLOT_SCHEMA, "async_delete_time_slot"
+        SERVICE_DELETE_TIME_SLOT,
+        DELETE_TIME_SLOT_SCHEMA.schema,
+        "async_delete_time_slot",
     )
     platform.async_register_entity_service(
-        SERVICE_CLEAR_SCHEDULE, CLEAR_SCHEDULE_SCHEMA, "async_clear_schedule"
+        SERVICE_CLEAR_SCHEDULE, CLEAR_SCHEDULE_SCHEMA.schema, "async_clear_schedule"
     )
     platform.async_register_entity_service(
         SERVICE_GET_SCHEDULE,

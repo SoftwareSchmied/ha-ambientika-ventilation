@@ -69,7 +69,7 @@ async def async_setup_entry(
 
     platform = entity_platform.async_get_current_platform()
     platform.async_register_entity_service(
-        SERVICE_SET_STATE, SET_STATE_SCHEMA, "async_set_state"
+        SERVICE_SET_STATE, SET_STATE_SCHEMA.schema, "async_set_state"
     )
 
     add_new_entities()
