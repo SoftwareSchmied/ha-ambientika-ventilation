@@ -34,7 +34,7 @@ test = [
 packages = []
 
 [tool.pytest.ini_options]
-addopts = "-ra --strict-markers --strict-config --cov=custom_components.ambientika_ventilation --cov-branch --cov-report=term-missing --cov-report=xml --cov-fail-under=95"
+addopts = "-ra --strict-markers --strict-config --cov=custom_components.ambientika_ventilation --cov-branch --cov-report=term-missing --cov-report=xml --cov-fail-under=98"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]

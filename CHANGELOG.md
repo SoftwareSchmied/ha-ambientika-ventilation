@@ -6,6 +6,28 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+- Wire the derived-data engine: one engine per entry, updated after every poll
+  (also unchanged ones), on every local change and every minute while a unit is
+  on, with counters in their own `.storage` file (saved every five minutes and
+  on unload). About 100 new sensors and binary sensors per unit, zone and
+  house, created from the description table, with EN and DE names, enum state
+  translations and icons; most are disabled by default. Unit values sit on the
+  unit's device, zone totals on the zone master's device and house totals on a
+  new house device. Entities write state only for reportable changes.
+- Command statistics: sent, confirmed (cloud read-back or a matching local
+  frame), unconfirmed and rejected commands with latencies per source. The
+  filter reset button also restarts the filter counters.
+- New options: outdoor weather entity or separate temperature and humidity
+  sensors (units °C, °F, K), filter hours basis (operating or powered-on) and a
+  second step for the room volume of each unit.
+- House address, coordinates, time zone and house time are back as five
+  separate diagnostic sensors on the house device, disabled by default; they
+  remain out of all attributes and the diagnostics.
+- Remove the duplicate entity `last_local_frame`; `last_seen_local` is enabled
+  by default. With local reception off, the local-only entities and the local
+  variants are no longer created.
+- Raise the enforced test coverage to 98 % and update the quality scale
+  self-assessment (repair issues, entity event setup).
 - Weekly schedules as a Home Assistant calendar. Each controllable unit with a
   schedule gets a calendar entity that shows its time slots as weekly recurring
   events in the house time zone (daylight saving time safe), with mode, fan

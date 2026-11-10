@@ -310,9 +310,6 @@
       "heartbeat_age": {
         "name": "Local heartbeat age"
       },
-      "last_local_frame": {
-        "name": "Last local frame"
-      },
       "last_seen": {
         "name": "Last seen"
       },
@@ -336,6 +333,325 @@
       },
       "cloud_last_failure_kind": {
         "name": "Cloud last failure kind"
+      },
+      "operating_hours": {
+        "name": "Operating hours"
+      },
+      "on_hours": {
+        "name": "Powered-on hours"
+      },
+      "operating_hours_today": {
+        "name": "Operating hours today"
+      },
+      "runtime_mode_smart": {
+        "name": "Runtime Smart"
+      },
+      "runtime_mode_auto": {
+        "name": "Runtime Auto"
+      },
+      "runtime_mode_heat_recovery": {
+        "name": "Runtime Heat recovery"
+      },
+      "runtime_mode_night": {
+        "name": "Runtime Night"
+      },
+      "runtime_mode_away": {
+        "name": "Runtime Away"
+      },
+      "runtime_mode_surveillance": {
+        "name": "Runtime Surveillance"
+      },
+      "runtime_mode_timed_extraction": {
+        "name": "Runtime Timed extraction"
+      },
+      "runtime_mode_extraction": {
+        "name": "Runtime Extraction"
+      },
+      "runtime_mode_intake": {
+        "name": "Runtime Intake"
+      },
+      "runtime_mode_master_slave_flow": {
+        "name": "Runtime Master to slave flow"
+      },
+      "runtime_mode_slave_master_flow": {
+        "name": "Runtime Slave to master flow"
+      },
+      "runtime_mode_off": {
+        "name": "Off time"
+      },
+      "runtime_mode_turbo": {
+        "name": "Runtime Turbo"
+      },
+      "runtime_stage_night": {
+        "name": "Runtime stage Night"
+      },
+      "runtime_stage_low": {
+        "name": "Runtime stage Low"
+      },
+      "runtime_stage_medium": {
+        "name": "Runtime stage Medium"
+      },
+      "runtime_stage_high": {
+        "name": "Runtime stage High"
+      },
+      "runtime_stage_turbo": {
+        "name": "Runtime stage Turbo"
+      },
+      "runtime_direction_exhaust": {
+        "name": "Runtime exhaust"
+      },
+      "runtime_direction_intake": {
+        "name": "Runtime intake"
+      },
+      "runtime_direction_stopped": {
+        "name": "Runtime stopped or reversing"
+      },
+      "reversals": {
+        "name": "Direction reversals"
+      },
+      "heat_recovery_cycles": {
+        "name": "Heat recovery cycles"
+      },
+      "half_cycle_duration": {
+        "name": "Half cycle duration"
+      },
+      "airflow": {
+        "name": "Airflow"
+      },
+      "fresh_air_flow": {
+        "name": "Fresh air flow"
+      },
+      "air_volume": {
+        "name": "Air volume moved"
+      },
+      "air_change_rate": {
+        "name": "Air change rate"
+      },
+      "power_estimate": {
+        "name": "Estimated power"
+      },
+      "energy_estimate": {
+        "name": "Estimated energy"
+      },
+      "heat_recovered_power": {
+        "name": "Recovered heat power"
+      },
+      "heat_recovered_energy": {
+        "name": "Recovered heat energy"
+      },
+      "ventilation_loss_power": {
+        "name": "Ventilation heat loss power"
+      },
+      "ventilation_loss_energy": {
+        "name": "Ventilation heat loss energy"
+      },
+      "moisture_recovered": {
+        "name": "Recovered moisture"
+      },
+      "dew_point": {
+        "name": "Dew point"
+      },
+      "absolute_humidity": {
+        "name": "Absolute humidity"
+      },
+      "humidity_setpoint": {
+        "name": "Humidity setpoint"
+      },
+      "humidity_setpoint_distance": {
+        "name": "Humidity distance to setpoint"
+      },
+      "comfort": {
+        "name": "Humidity comfort",
+        "state": {
+          "too_dry": "Too dry",
+          "dry": "Dry",
+          "comfortable": "Comfortable",
+          "humid": "Humid",
+          "too_humid": "Too humid"
+        }
+      },
+      "room_temperature": {
+        "name": "Room temperature (last valid)"
+      },
+      "room_humidity": {
+        "name": "Room humidity (last valid)"
+      },
+      "measurement_context": {
+        "name": "Measurement context",
+        "state": {
+          "stopped": "Stopped",
+          "settling": "Settling",
+          "exhaust": "Exhaust",
+          "intake": "Intake",
+          "reversing": "Reversing",
+          "running": "Running",
+          "unknown": "Unknown"
+        }
+      },
+      "measurement_last_valid": {
+        "name": "Last valid measurement"
+      },
+      "drying_potential": {
+        "name": "Drying potential"
+      },
+      "air_quality_index": {
+        "name": "Air quality index"
+      },
+      "filter_hours": {
+        "name": "Filter operating hours"
+      },
+      "filter_remaining_hours": {
+        "name": "Filter remaining hours"
+      },
+      "filter_alarm_predicted": {
+        "name": "Filter alarm expected on"
+      },
+      "filter_clean_due": {
+        "name": "Filter cleaning due"
+      },
+      "filter_replace_due": {
+        "name": "Filter replacement due"
+      },
+      "filter_last_reset": {
+        "name": "Filter last reset"
+      },
+      "filter_medium_hours": {
+        "name": "Filter hours at Medium"
+      },
+      "filter_alarm_hours": {
+        "name": "Filter hours at alarm"
+      },
+      "smart_behaviour": {
+        "name": "Smart behaviour",
+        "state": {
+          "idle": "Idle",
+          "heat_recovery": "Heat recovery",
+          "night_heat_recovery": "Night heat recovery",
+          "free_cooling": "Free cooling"
+        }
+      },
+      "timed_exhaust_ends": {
+        "name": "Timed extraction ends"
+      },
+      "damper_state": {
+        "name": "Damper state",
+        "state": {
+          "closed": "Closed",
+          "opening": "Opening",
+          "open": "Open",
+          "closing": "Closing"
+        }
+      },
+      "humidity_alarm_duration": {
+        "name": "Humidity alarm duration"
+      },
+      "humidity_alarm_today": {
+        "name": "Humidity alarm today"
+      },
+      "humidity_alarm_current": {
+        "name": "Humidity alarm current"
+      },
+      "night_alarm_duration": {
+        "name": "Night alarm duration"
+      },
+      "night_alarm_today": {
+        "name": "Night alarm today"
+      },
+      "night_alarm_current": {
+        "name": "Night alarm current"
+      },
+      "command_latency": {
+        "name": "Last command latency"
+      },
+      "command_latency_cloud": {
+        "name": "Command latency (cloud)"
+      },
+      "command_latency_local": {
+        "name": "Command latency (local)"
+      },
+      "command_latency_average": {
+        "name": "Average command latency"
+      },
+      "commands_sent": {
+        "name": "Commands sent"
+      },
+      "commands_confirmed": {
+        "name": "Commands confirmed"
+      },
+      "commands_unconfirmed": {
+        "name": "Commands unconfirmed"
+      },
+      "commands_rejected": {
+        "name": "Commands rejected"
+      },
+      "zone_airflow": {
+        "name": "Zone airflow"
+      },
+      "zone_power": {
+        "name": "Zone estimated power"
+      },
+      "zone_energy": {
+        "name": "Zone estimated energy"
+      },
+      "zone_air_volume": {
+        "name": "Zone air volume moved"
+      },
+      "zone_running_units": {
+        "name": "Zone running units"
+      },
+      "zone_units": {
+        "name": "Zone units"
+      },
+      "zone_heat_recovered_power": {
+        "name": "Zone recovered heat power"
+      },
+      "zone_heat_recovered_energy": {
+        "name": "Zone recovered heat energy"
+      },
+      "house_airflow": {
+        "name": "House airflow"
+      },
+      "house_power": {
+        "name": "House estimated power"
+      },
+      "house_energy": {
+        "name": "House estimated energy"
+      },
+      "house_air_volume": {
+        "name": "House air volume moved"
+      },
+      "house_running_units": {
+        "name": "House running units"
+      },
+      "house_units": {
+        "name": "House units"
+      },
+      "house_heat_recovered_power": {
+        "name": "House recovered heat power"
+      },
+      "house_heat_recovered_energy": {
+        "name": "House recovered heat energy"
+      },
+      "outdoor_dew_point": {
+        "name": "Outdoor dew point"
+      },
+      "outdoor_absolute_humidity": {
+        "name": "Outdoor absolute humidity"
+      },
+      "house_address": {
+        "name": "House address"
+      },
+      "house_latitude": {
+        "name": "House latitude"
+      },
+      "house_longitude": {
+        "name": "House longitude"
+      },
+      "house_time_zone": {
+        "name": "House time zone"
+      },
+      "house_time": {
+        "name": "House time"
       }
     },
     "binary_sensor": {
@@ -374,6 +690,24 @@
       },
       "cloud_reachable": {
         "name": "Cloud reachable"
+      },
+      "measurement_valid": {
+        "name": "Measurement representative"
+      },
+      "outdoor_humidifies": {
+        "name": "Outdoor air would humidify"
+      },
+      "humidity_exhaust_active": {
+        "name": "Humidity exhaust active"
+      },
+      "night_reduction_active": {
+        "name": "Night reduction active"
+      },
+      "timed_exhaust_active": {
+        "name": "Timed extraction active"
+      },
+      "free_cooling_active": {
+        "name": "Free cooling active"
       }
     },
     "select": {
@@ -431,17 +765,29 @@
     "step": {
       "init": {
         "title": "Ambientika options",
-        "description": "Choose how often the Ambientika cloud is polled. The unit reports about every 30 seconds, so shorter intervals bring nothing. After a command the integration polls every 30 seconds for three minutes, and it slows down automatically while the cloud is unreachable. Local UDP reception adds live values from the units' broadcasts on your network.",
+        "description": "Choose how often the Ambientika cloud is polled. The unit reports about every 30 seconds, so shorter intervals bring nothing. After a command the integration polls every 30 seconds for three minutes, and it slows down automatically while the cloud is unreachable. Local UDP reception adds live values from the units' broadcasts on your network. The outdoor source and the filter basis control the derived values; the next step asks for the room volumes.",
         "data": {
           "scan_interval": "Polling interval",
           "local_udp": "Local UDP reception",
-          "raw_variants": "Create raw source variants"
+          "raw_variants": "Create raw source variants",
+          "outdoor_weather": "Outdoor weather entity",
+          "outdoor_temperature": "Outdoor temperature sensor",
+          "outdoor_humidity": "Outdoor humidity sensor",
+          "filter_basis": "Filter hours count"
         },
         "data_description": {
           "scan_interval": "Seconds between cloud updates (30 to 600).",
           "local_udp": "Automatic listens for up to 60 seconds after each start and keeps listening only if your units are heard. On always listens and reports a problem if nothing arrives. Off never listens.",
-          "raw_variants": "Enable the additional Cloud and local variants of power, running and last seen. They are created disabled by default."
+          "raw_variants": "Enable the additional Cloud and local variants of power, running and last seen. They are created disabled by default.",
+          "outdoor_weather": "A weather entity for the outdoor temperature and humidity. Enables heat recovery, outdoor dew point and drying potential.",
+          "outdoor_temperature": "Optional temperature sensor; used instead of the weather entity's temperature.",
+          "outdoor_humidity": "Optional humidity sensor; used instead of the weather entity's humidity.",
+          "filter_basis": "Operating hours count only while the fan moves air; powered-on time counts whenever the unit is on."
         }
+      },
+      "volumes": {
+        "title": "Room volumes",
+        "description": "Optional: enter the air volume in m³ of the room each unit serves. It is used for the air change rate. Leave a field empty to skip the unit."
       }
     }
   },
@@ -537,6 +883,12 @@
         "auto": "Automatic (detect)",
         "on": "On",
         "off": "Off"
+      }
+    },
+    "filter_basis": {
+      "options": {
+        "operating": "Operating hours (fan moves air)",
+        "on_time": "Powered-on time"
       }
     }
   },

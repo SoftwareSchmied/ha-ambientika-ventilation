@@ -170,3 +170,45 @@ def session_double() -> MagicMock:
     session = MagicMock()
     session.close = AsyncMock()
     return session
+
+
+@contextmanager
+def patch_session(api: AsyncMock):
+    """Patch the session and the cloud client of the setup with ``api``."""
+    with (
+        patch(
+            "custom_components.ambientika_ventilation.create_session",
+            return_value=session_double(),
+        ),
+        patch(
+            "custom_components.ambientika_ventilation.AmbientikaApiClient",
+            return_value=api,
+        ),
+    ):
+        yield api
+
+
+SECOND = "AABBCCDDEE02"
+
+
+def two_zone_payload(houses_payload: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return one house with two zones, each with one master (no Gemini unit)."""
+    import copy
+
+    payload = copy.deepcopy(houses_payload)
+    house = payload[0]
+    house["geminiDevices"] = []
+    house["houseZonesCount"] = 2
+    second = copy.deepcopy(house["nonGeminiZones"][0])
+    second["id"] = 302
+    second["name"] = "Upper floor"
+    room = second["rooms"][0]
+    room["id"] = 202
+    room["name"] = "Bedroom"
+    device = room["devices"][0]
+    device.update(
+        {"id": 103, "serialNumber": SECOND, "name": "Bedroom unit", "zoneIndex": 2}
+    )
+    device["roomId"] = 202
+    house["nonGeminiZones"].append(second)
+    return payload

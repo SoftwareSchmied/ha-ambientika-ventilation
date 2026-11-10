@@ -95,6 +95,7 @@ class AmbientikaLocal:
         self._bind_issue = False
         self._no_frames_issue = False
         self._issue_suffix = entry.entry_id
+        self._change_listeners: list[Callable[[tuple[str, ...]], None]] = []
 
     # ------------------------------------------------------------------ setup
 
@@ -111,6 +112,21 @@ class AmbientikaLocal:
     def attach(self) -> Callable[[], None]:
         """Persist topology changes and follow them with the listeners."""
         return self._hub.subscribe_topology(self._on_topology)
+
+    def add_change_listener(
+        self, listener: Callable[[tuple[str, ...]], None]
+    ) -> Callable[[], None]:
+        """Call ``listener(serials)`` when a local frame changes a zone's state.
+
+        Heartbeats (identical frames) do not call back.
+        """
+        self._change_listeners.append(listener)
+
+        def remove() -> None:
+            if listener in self._change_listeners:
+                self._change_listeners.remove(listener)
+
+        return remove
 
     async def async_start(self) -> None:
         """Start the listeners or schedule the probe, depending on the mode."""
@@ -227,6 +243,11 @@ class AmbientikaLocal:
         self._last_frame_at = self._clock()
         self._clear_issues()
         if changed and serials:
+            for listener in list(self._change_listeners):
+                try:
+                    listener(serials)
+                except Exception:
+                    _LOGGER.exception("Local change listener failed")
             self._request_refresh()
 
     def _request_refresh(self) -> None:

@@ -418,6 +418,10 @@ class AmbientikaHub:
         """Return zones with local frames but no known device."""
         return frozenset(zone for zone in self._local if zone not in self._zones)
 
+    def local_state(self, house_id: int, zone_index: int) -> LocalZoneState | None:
+        """Return the latest local view of a zone (None before the first frame)."""
+        return self._local.get((house_id, zone_index))
+
     def devices_in_zone(self, house_id: int, zone_index: int) -> tuple[str, ...]:
         """Return the serials of a zone."""
         return self._zones.get((house_id, zone_index), ())

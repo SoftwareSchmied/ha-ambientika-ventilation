@@ -13,11 +13,11 @@ from homeassistant.helpers.entity import Entity, EntityDescription
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CLOUD_DEVICE_PREFIX, DOMAIN, THROTTLE_INTERVAL
+from .const import CLOUD_DEVICE_PREFIX, DOMAIN, HOUSE_DEVICE_PREFIX, THROTTLE_INTERVAL
 from .coordinator import AmbientikaCoordinator, firmware_text
 from .datapoints import Source, variant_keys
 from .hub import AmbientikaHub, CloudHealth, ResolvedValue
-from .models import AmbientikaDeviceData, AmbientikaStatus
+from .models import AmbientikaDevice, AmbientikaDeviceData, AmbientikaStatus
 
 
 class AmbientikaEntity(CoordinatorEntity[AmbientikaCoordinator]):
@@ -63,24 +63,39 @@ class AmbientikaEntity(CoordinatorEntity[AmbientikaCoordinator]):
     @property
     def device_info(self) -> DeviceInfo:
         """Return Home Assistant device registry metadata."""
-        device = self.device_data.device
-        model = device.device_type or "Ambientika ventilation unit"
-        if device.device_subtype and device.device_subtype != "None":
-            model = f"{model} {device.device_subtype}"
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._serial)},
-            manufacturer="Südwind",
-            name=device.name,
-            model=model,
-            hw_version=(
-                device.device_subtype
-                if device.device_subtype not in (None, "None")
-                else None
-            ),
-            serial_number=self._serial,
-            suggested_area=device.room_name,
-            sw_version=firmware_text(device),
-        )
+        return unit_device_info(self._serial, self.device_data.device)
+
+
+def unit_device_info(serial: str, device: AmbientikaDevice) -> DeviceInfo:
+    """Return the registry metadata of one unit (also used by derived entities)."""
+    model = device.device_type or "Ambientika ventilation unit"
+    if device.device_subtype and device.device_subtype != "None":
+        model = f"{model} {device.device_subtype}"
+    return DeviceInfo(
+        identifiers={(DOMAIN, serial)},
+        manufacturer="Südwind",
+        name=device.name,
+        model=model,
+        hw_version=(
+            device.device_subtype
+            if device.device_subtype not in (None, "None")
+            else None
+        ),
+        serial_number=serial,
+        suggested_area=device.room_name,
+        sw_version=firmware_text(device),
+    )
+
+
+def house_device_info(house_id: int, name: str | None) -> DeviceInfo:
+    """Return the registry metadata of the device that carries house-level data."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{HOUSE_DEVICE_PREFIX}{house_id}")},
+        name=name or "Ambientika house",
+        manufacturer="Südwind",
+        model="House",
+        entry_type=DeviceEntryType.SERVICE,
+    )
 
 
 # --- Hub-backed entities ----------------------------------------------------
@@ -102,6 +117,8 @@ class HubFields:
     """``cloud`` or ``local`` to show one raw source, None for the effective value."""
     throttled: bool = False
     """Volatile value, written at most once per :data:`THROTTLE_INTERVAL`."""
+    local_only: bool = False
+    """Exists only with local reception (``local_udp`` is not ``off``)."""
 
 
 def with_variants[D: HubFields](description: D) -> tuple[D, D, D]:
@@ -123,6 +140,15 @@ def with_variants[D: HubFields](description: D) -> tuple[D, D, D]:
         for variant in VARIANT_SOURCES
     )
     return description, cloud, local
+
+
+def hub_entity_wanted(fields: HubFields, local_off: bool) -> bool:
+    """Return whether a hub entity is created.
+
+    Local-only entities and the raw ``_local`` variants make no sense while the
+    local reception is switched off.
+    """
+    return not (local_off and (fields.local_only or fields.variant == "local"))
 
 
 def hub_device_serials(coordinator: AmbientikaCoordinator) -> set[str]:

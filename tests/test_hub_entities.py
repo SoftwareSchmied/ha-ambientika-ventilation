@@ -183,6 +183,7 @@ async def test_hub_diagnostics_hide_identifiers(hass) -> None:
             ),
             hub=hub_with_local_data(),
             local=SimpleNamespace(diagnostics=lambda: {"mode": "on"}),
+            analytics=SimpleNamespace(diagnostics=lambda: {"units": 0}),
         ),
         version=1,
         minor_version=1,
