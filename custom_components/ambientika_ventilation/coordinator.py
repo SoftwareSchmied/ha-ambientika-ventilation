@@ -371,9 +371,7 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             causes = "; ".join(self._cycle_causes) or "no usable status packets"
             # A unit without power is not a cloud outage: keep the normal pace.
             self._cycle_outage = not failed_devices <= self._cycle_offline
-            raise update_failed(
-                f"No Ambientika device status could be read ({causes})"
-            )
+            raise update_failed(f"No Ambientika device status could be read ({causes})")
 
         # Offline devices are logged separately on their own transitions.
         newly_failed = failed_devices - self._failed_devices - self.offline_devices

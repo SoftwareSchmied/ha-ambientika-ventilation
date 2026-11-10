@@ -57,6 +57,23 @@ services**, uninstall it in HACS, and restart Home Assistant. Removing the
 config entry does not delete the account or change any device configuration in
 the Ambientika cloud.
 
+## Credentials, discovery and stale devices
+
+- **Do not store the password:** The setup and reconfigure forms offer this
+  option (off by default). Only the 180-day token is then kept in the Home
+  Assistant storage; it is renewed automatically about 30 days before it
+  expires. If renewal fails, or Home Assistant was offline for longer than the
+  token lives, you are asked to sign in again (reauthentication). The
+  trade-off: no password on disk, but occasional reauthentication instead of
+  silent re-login.
+- **Discovery:** Units announce the DHCP host names `VMC_<MAC>` and
+  `GMN_<MAC>`. Home Assistant then offers the setup; the cloud credentials are
+  still required. Nothing is offered once the account is configured.
+- **Stale devices:** A device the cloud no longer reports can be deleted
+  manually. It is also removed automatically after it was missing from four
+  consecutive successful discoveries (about 24 hours). Failed or empty
+  discoveries never remove anything.
+
 ## Key features
 
 - Home Assistant Config Flow with token refresh and reauthentication
