@@ -27,11 +27,13 @@ Ambientika Ventilation discovers the supported devices on an Ambientika
 account and provides monitoring and safe controls without YAML.
 
 > [!IMPORTANT]
-> Version 0.9.2 adds read-only slave sensors. The integration has been validated
-> against the live cloud API, the official Android app 1.5.1, and Ambientika
-> Ghost installations. Initial community testing confirmed slave readings and
-> master controls on Ghost Version160. Longer-term feedback and reports from
-> other device families and firmware versions remain welcome.
+> Version 1.0.0-beta.1 is a prerelease. It adds local data from the UDP
+> broadcasts of the units, about 100 derived values, schedules as a calendar,
+> and a robustness and efficiency overhaul of the cloud connection. Existing
+> entity IDs, history and automations are kept. It was tested on Home
+> Assistant 2026.11.1 with two Ghost masters. The current stable release is
+> 0.9.3. For local data, Home Assistant should be in the same network (VLAN) as
+> the units, see [Local data](#local-data). Feedback is welcome.
 
 ## Quick installation
 
@@ -87,14 +89,23 @@ the Ambientika cloud.
 - Optional diagnostic entities for topology, firmware, role, and installation data
 - Optional local data: the UDP broadcasts of the units add the physical
   direction, fan stage and coupling within seconds, with the cloud as fallback
+- Effective values that prefer fresh local data, with optional raw cloud and
+  local variants for comparison
+- About 100 derived values: runtimes, airflow and air volume, estimated power
+  and energy, heat recovery, dew point, filter forecast, zone and house totals
+- Weekly schedules as an editable calendar, plus the `set_state` action for
+  atomic changes
 - Partial-failure handling, rate-limit backoff, and last-good-value retention
 - Privacy-preserving diagnostics and complete English/German translations
 
 ## Requirements
 
-- Home Assistant 2026.8.0 or newer
+- Home Assistant 2026.9.0 or newer (tested with 2026.9.4, 2026.10.4 and
+  2026.11.1)
 - An Ambientika cloud account with at least one configured ventilation unit
 - Internet access from Home Assistant to `app.ambientika.eu` on TCP port 4521
+- For local data (optional, recommended): Home Assistant in the same network
+  or VLAN as the units, see [Local data](#local-data)
 
 This integration uses the same email address and password as the Ambientika
 mobile app. The vendor API currently exposes password authentication and JWT
@@ -218,7 +229,17 @@ The master of every zone broadcasts its physical state (zone coupling,
 airflow direction, fan stage) on the local network every 27 seconds and
 immediately on every change. The integration listens passively to these UDP
 frames (UDP port 45000 plus the zone index, one per zone; nothing is sent) and combines them
-with the cloud values:
+with the cloud values.
+
+> [!TIP]
+> **Put Home Assistant in the same network as the units.** Broadcasts only
+> reach devices in the same network segment; routers never forward them, and
+> firewall rules between VLANs do not change that. If the units are in an IoT
+> VLAN, give Home Assistant an additional interface in that VLAN (one command
+> on Home Assistant OS, see the network requirements below). Without local
+> frames the integration works with the cloud alone.
+
+What the local data adds:
 
 - For power, running and last seen, every unit has an **effective** entity,
   which prefers the local value while it is fresh and falls back to the cloud.
@@ -254,7 +275,8 @@ OS this is one command, for example with a free address and without a gateway
 so that the default route stays unchanged:
 
 ```shell
-ha network vlan <interface> <vlan id> --ipv4-method static   --ipv4-address 192.168.30.49/24 --ipv6-method disabled --mdns off --llmnr off
+ha network vlan <interface> <vlan id> --ipv4-method static \
+  --ipv4-address <free address>/24 --ipv6-method disabled --mdns off --llmnr off
 ```
 
 The switch port of the Home Assistant host (or its hypervisor bridge) must

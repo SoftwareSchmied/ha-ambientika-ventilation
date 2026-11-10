@@ -21,13 +21,13 @@ security = [
   "pip-audit==2.10.1",
 ]
 test = [
-  "homeassistant==2026.9.4",
-  "pytest-homeassistant-custom-component==0.13.367",
+  "homeassistant==2026.10.4",
+  "pytest-homeassistant-custom-component==0.13.375",
   "pytest==9.0.3",
   "pytest-asyncio==1.4.0",
   "pytest-cov==7.1.0",
-  "ruff==0.16.10",
-  "mypy==2.4.0",
+  "ruff==0.17.4",
+  "mypy==2.4.1",
 ]
 
 [tool.setuptools]
@@ -72,3 +72,16 @@ strict = true
 files = ["custom_components/ambientika_ventilation"]
 ignore_missing_imports = true
 exclude = ["tests"]
+
+[[tool.mypy.overrides]]
+# Inside Home Assistant (2026.9+) `voluptuous` is an alias of `probatio`
+# (installed by `homeassistant/__init__.py`); mypy sees two packages, so treat
+# voluptuous as untyped instead of reporting false schema type mismatches.
+module = ["voluptuous", "voluptuous.*"]
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+# Platform packages re-export their constants (for example FanEntityFeature)
+# without `__all__`; core integrations import them the same way.
+module = ["homeassistant.components.*"]
+implicit_reexport = true

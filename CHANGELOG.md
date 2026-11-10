@@ -6,129 +6,166 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-- Wire the derived-data engine: one engine per entry, updated after every poll
-  (also unchanged ones), on every local change and every minute while a unit is
-  on, with counters in their own `.storage` file (saved every five minutes and
-  on unload). About 100 new sensors and binary sensors per unit, zone and
-  house, created from the description table, with EN and DE names, enum state
-  translations and icons; most are disabled by default. Unit values sit on the
-  unit's device, zone totals on the zone master's device and house totals on a
-  new house device. Entities write state only for reportable changes.
-- Command statistics: sent, confirmed (cloud read-back or a matching local
-  frame), unconfirmed and rejected commands with latencies per source. The
-  filter reset button also restarts the filter counters.
-- New options: outdoor weather entity or separate temperature and humidity
-  sensors (units °C, °F, K), filter hours basis (operating or powered-on) and a
-  second step for the room volume of each unit.
-- House address, coordinates, time zone and house time are back as five
-  separate diagnostic sensors on the house device, disabled by default; they
-  remain out of all attributes and the diagnostics.
-- Remove the duplicate entity `last_local_frame`; `last_seen_local` is enabled
-  by default. With local reception off, the local-only entities and the local
-  variants are no longer created.
-- Raise the enforced test coverage to 98 % and update the quality scale
-  self-assessment (repair issues, entity event setup).
-- Weekly schedules as a Home Assistant calendar. Each controllable unit with a
-  schedule gets a calendar entity that shows its time slots as weekly recurring
-  events in the house time zone (daylight saving time safe), with mode, fan
-  speed and humidity target in the title. The calendar is read-only when the
-  account lacks the `weeklyScheduler` feature or the unit reports
-  `NotAvailable`.
-- Edit schedules: create, change and delete events in the calendar (only events
-  that repeat weekly on their own weekday map to a time slot) or use the new
-  actions `set_time_slot`, `delete_time_slot`, `clear_schedule` (needs an
-  explicit confirmation) and `get_schedule` (response only). Values are checked
-  before anything is sent: weekday, start before end, whole minutes, no
-  overlapping slots, no fan speed `Night`, Turbo only when allowed. The cloud's
-  overlap rejection (HTTP 400) is reported clearly and the schedule is re-read
-  after every change. The three write endpoints come from the official app and
-  still need validation against hardware.
-- Add a derived-data engine (pure modules `analytics.py`, `psychrometrics.py`,
-  `weather_input.py`, `analytics_descriptions.py`; documented in
-  `docs/DERIVED_DATA.md`): runtimes per mode, stage and direction, reversal and
-  cycle counters, airflow and moved air volume, air change rate, estimated power
-  and energy, recovered heat and ventilation heat loss from an outdoor source,
-  dew point, absolute humidity and humidity distance to the setpoint, numeric air
-  quality, filter remaining hours and predicted alarm date, visible automatic
-  actions (humidity exhaust, night reduction, timed extraction, Smart behaviour,
-  free cooling, damper estimate), measurement validity with last valid room
-  values (the unit reads the wall duct while stopped), alarm durations, command
-  latency statistics and zone/house totals. Estimates are marked as such,
-  counters survive restarts and the recorder budget (rounding, thresholds,
-  minimum write intervals) is declared per value.
-- Hybrid data model: every value available from both sources has a cloud
-  variant, a local variant and an effective value that prefers the local one
-  while it is fresh. The integration creates one hub per entry, which the
-  coordinator feeds after every poll (also unchanged ones) together with
-  request health, and which a 10 s timer ages.
-- Local UDP reception of the broadcasts of the units, with the options "Local
-  UDP reception" (automatic, on, off; automatic probes for up to 60 s in the
-  background and remembers the result) and "Create raw source variants". A
-  UDP-detected change asks the cloud for confirmation at most every 30 s.
-  Port or reception problems in mode "on" raise a repair issue with the
-  network requirements (HAOS/Supervised, Docker host network, VLAN broadcast
-  forwarding); it resolves itself when frames arrive.
-- New entities per unit: power, running, physical direction, physical fan
-  stage, zone coupling, last seen, last local frame and the diagnostic data
-  source; disabled by default: the `_cloud`/`_local` variants and the heartbeat
-  age. New "Ambientika cloud" device with cloud reachability and request health
-  diagnostics. Controls and selects keep following the cloud setting.
-- The device placement is cached in `.storage`; the cache is removed with the
-  config entry. Setup still needs one successful cloud poll: when the cloud is
-  unreachable at startup, Home Assistant retries the setup as before. Starting
-  from the cache alone is planned for a later release.
-- Diagnostics include hub and listener counters (serials masked, no house id,
-  no addresses).
-- Local power only claims "on" for moving air or a non-idle coupling (an idle
-  unit in Away mode is not shown as off); the physical fan stage is unknown
-  while the unit is idle. Volatile values no longer notify when only the
-  winning source of "last seen" changes.
-- Merge commands for one unit that arrive together (for example mode and
-  humidity target in a scene) into a single cloud request, based on the last
-  known state plus commands not yet confirmed. Add the action
-  `ambientika_ventilation.set_state` to set mode, fan speed, humidity target and
-  light sensitivity atomically. The written values appear at once instead of
-  after the read-back.
-- A poll that started before or shortly after a command no longer overwrites the
-  commanded values with the old state the cloud still returns.
-- Turbo is only offered when the server feature flag `turboMode` is not switched
-  off (a missing flag counts as on). Status fields are read regardless of
-  capitalization (for example `IsTurboAvailable`). The legacy Turbo operating
-  mode is shown read-only; unknown enum values show as unknown with a
-  `raw_value` attribute instead of failing.
-- A unit whose status request is rejected with HTTP 403 or 404 is retried after
-  1, 2, 5 and 15 minutes and only treated as unsupported after four consecutive
-  rejections. New binary sensor "Cloud connection" per unit, which stays
-  available while the unit is offline.
-- An empty discovery answer no longer removes all known devices; it is handled
-  like any other discovery failure (previous list kept, retry with backoff).
-- Poll requests make a single attempt (the next poll is the retry). While the
-  cloud is unreachable the poll interval grows up to ten minutes. Requests time
-  out after 10 s (5 s to connect), a status update has a time budget below the
-  interval, and commands have their own request lane so a hanging poll cannot
-  block them.
-- Renew the login token when fewer than 30 days remain (checked daily), and do
-  not log in again when another request already renewed the token.
-- Use a dedicated connection pool with 120 s keep-alive instead of Home
-  Assistant's shared session, which closes idle connections after 15 s. This
-  avoids a TLS handshake on every poll.
-- Add an options flow for the poll interval (30 to 600 s, default 60 s). After a
-  command the cloud is polled every 30 s for three minutes.
-- Update entities only when a poll brings changed data. Platforms look for new
-  entities only when the set of devices or their capabilities changes.
-- Read names, roles and firmware versions from every house status response:
-  update the device registry, fire `ambientika_ventilation_device_changed`,
-  start an early discovery for unknown devices, and keep a firmware history in
-  diagnostics.
-- Request weekly schedules only for units that report a schedule and as soon as
-  one starts reporting it, instead of probing every device every six hours.
-- Signal strength 0 from firmware without a signal field is shown as unknown.
-  The operating mode options are computed from the current device data.
-- Extend diagnostics: recent poll durations, interval and failure streak, token
-  expiry, request structure per endpoint, queue wait, discarded polls, and
-  per-device diagnostics.
-- Authentication errors while reading optional house metadata or feature flags
-  are no longer swallowed.
+## [1.0.0-beta.1] - 2026-11-10
+
+First beta of 1.0. It combines the cloud integration with the local UDP
+broadcasts of the units. It also adds about 100 derived values, schedules as a
+calendar, and a large robustness and efficiency overhaul. Existing entity IDs,
+history and automations are kept. Tested on Home Assistant 2026.11.1 with two
+Ghost masters in separate zones. The minimum Home Assistant version is now
+2026.9.0.
+
+### Local data (UDP) and hybrid model
+
+- Passive reception of the UDP broadcasts of the zone masters (ports 45000 and
+  up; nothing is sent). They carry the physical state, which is the zone
+  coupling, airflow direction and fan stage. They arrive every 27 s and
+  immediately on every change.
+- New option "Local UDP reception" with the values automatic, on and off.
+  Automatic is the default: it listens for up to 60 s in the background after
+  setup and remembers the result.
+- Hybrid model: values available from both sources (power, running, last seen)
+  get an effective entity that prefers the local value while it is fresh. They
+  also get `(Cloud)` and `(local)` variants, which are disabled unless the
+  option "Create raw source variants" is on. Controls and selects keep
+  following the cloud setting.
+- New entities per unit:
+  - power, running, physical direction, physical fan stage and zone coupling
+  - last seen, both effective and local
+  - data source (`local_udp`, `cloud`, `degraded`, `offline`)
+  - heartbeat age (disabled)
+
+  A new "Ambientika cloud" device shows reachability and request health.
+- Commands are confirmed locally about 6 s after they are sent. A change
+  detected over UDP asks the cloud for confirmation at most every 30 s.
+- Frames are checked for length, header, zone, ports, house id, sender and
+  rate. Local data is informative only and never bypasses locks.
+- Repair issues explain bind failures and missing frames in mode "on". The
+  diagnostics show the result of the last automatic probe: bound ports, frames
+  heard and rejected frames.
+
+### Network requirements for local data
+
+- Home Assistant must be in the same network (layer 2 segment or VLAN) as the
+  units. Routers never forward broadcasts, and firewall rules between VLANs do
+  not change that.
+- Home Assistant OS and Supervised work directly when they share the network
+  with the units. Docker needs `network_mode: host`.
+- Units in an IoT VLAN need one of the following:
+  - an interface for Home Assistant in that VLAN; on Home Assistant OS use
+    `ha network vlan <interface> <id>` with a static address and no gateway
+    (see the README)
+  - a second virtual network card with the VLAN tag in the hypervisor
+
+  Without local frames, everything keeps working with the cloud.
+
+### Derived data
+
+- About 100 derived sensors per unit, zone and house. Most are disabled by
+  default. They cover:
+  - runtimes per mode, stage and direction, reversals and heat-recovery cycles
+  - airflow, moved air volume and the air change rate (needs a room volume)
+  - estimated power and energy
+  - recovered heat and ventilation heat loss (needs an outdoor source)
+  - dew point, absolute humidity, distance to the humidity setpoint, comfort
+    class and a numeric air quality
+  - filter hours, remaining hours and the predicted alarm date
+  - visible automatic actions: humidity exhaust, night reduction, timed
+    extraction, Smart behaviour and free cooling
+  - measurement validity with the last valid room values
+  - alarm durations and command statistics
+  - zone and house totals
+- New options: an outdoor weather entity or outdoor temperature and humidity
+  sensors (°C, °F, K), the filter hours basis, and the room volume per unit.
+- Estimates are marked as such, and counters survive restarts. Formulas and
+  sources are documented in `docs/DERIVED_DATA.md`.
+- While a unit stands still it measures the air in the wall duct. Climate
+  values derived from these readings use the last valid reading instead.
+
+### Schedules
+
+- Weekly schedules appear as a calendar for each unit that has a schedule, in
+  the house time zone. Events can be created, changed and deleted when the
+  account has the weekly scheduler feature.
+- New actions `set_time_slot`, `delete_time_slot`, `clear_schedule` (needs
+  `confirm: true`) and `get_schedule` (response only). Values and overlaps are
+  checked before anything is sent.
+- The write endpoints come from the official app. They are not yet verified
+  against a unit with an active schedule.
+
+### Cloud robustness and efficiency
+
+- A dedicated connection pool with 120 s keep-alive replaces the new TLS
+  handshake on every poll.
+- Poll interval:
+  - a new option, 30 to 600 s (default 60 s)
+  - 30 s for three minutes after a command
+  - growing to ten minutes while the cloud is unreachable
+- Polls make a single attempt, requests time out after 10 s, and commands have
+  their own request lane.
+- Commands for one unit that arrive together are merged into one request. The
+  new action `set_state` sets the mode, fan speed, humidity target and light
+  sensitivity at once.
+- A poll that started before a command no longer overwrites it. Confirmed
+  read-backs reach the hub immediately.
+- Entities update only when data changes. Names, roles and firmware are read
+  from every status response, and the diagnostics keep a firmware history.
+- Schedules are requested only for units that report one.
+- The login token is renewed when fewer than 30 days remain. A failed renewal
+  keeps the token that is still valid.
+- Units rejected with HTTP 403 or 404 are retried after 1, 2, 5 and 15 minutes
+  before they count as unsupported. An empty discovery no longer removes all
+  devices. There is a new binary sensor "Cloud connection" per unit.
+- Turbo respects the `turboMode` feature flag. Unknown enum values show as
+  unknown with a `raw_value` attribute.
+
+### Quality and privacy
+
+- Stale devices are removed after four successful discoveries without them,
+  and only once at least 24 hours have passed. Devices the cloud no longer
+  reports can also be removed manually.
+- DHCP discovery for the hostnames `VMC_*` and `GMN_*`.
+- New option "Do not store the password": only the 180-day token is stored and
+  renewed. If renewal fails, reauthentication starts.
+- The house sensor no longer has address, coordinates, time zone and house
+  time attributes. These values are now separate diagnostic sensors on a new
+  house device, disabled by default. No entity attribute exposes serials,
+  house ids or locations.
+- New `quality_scale.yaml`, icon translations, translated exceptions,
+  parallel update limits, and extended diagnostics with masked serials.
+- Test coverage is enforced at 98 %. CI runs with Python 3.14.7, plus a
+  non-blocking job against the newest Home Assistant release.
+
+### Fixed during the beta test
+
+- Entity actions are now registered with field dictionaries. Home Assistant
+  2026.11 rejected the previous schema and did not load the integration.
+- No fan stage, airflow or power is reported while the fan stands still, both
+  after a command (about 45 s) and during the ~10 s reversal.
+- The "no frames" repair issue is no longer reset by internal freshness
+  reports.
+- A new sender address is accepted after about 81 s instead of five minutes.
+
+### Known limitations
+
+- Setup still needs one successful cloud poll. Starting from the cached
+  topology while the cloud is down is planned for a later release.
+- Temperature, humidity, air quality and filter state come only from the cloud,
+  because the UDP broadcast does not carry them.
+
+### Maintenance
+
+- The test stack is updated to Home Assistant 2026.10.4 with
+  pytest-homeassistant-custom-component 0.13.375.
+- Ruff is updated to 0.17.4 and Mypy to 2.4.1, and the GitHub Actions
+  setup-python, hassfest and CodeQL are updated, all from Dependabot #18, #20
+  and #22.
+- Home Assistant 2026.11.0, pytest 9.2.0 and pytest-asyncio 1.4.1 from #22 are
+  not used, because the newest test plugin pins Home Assistant 2026.10.4,
+  pytest 9.0.3 and pytest-asyncio 1.4.0.
+- The Mypy configuration treats `voluptuous`, which is an alias of `probatio`
+  inside Home Assistant, as untyped, and allows the platform re-exports of
+  Home Assistant.
 
 ## [0.9.3] - 2026-11-10
 
@@ -231,7 +268,9 @@ All notable changes to this project are documented here. The format follows
 - Add reproducible release archives, HACS/hassfest validation, security checks,
   repository templates, and complete release documentation.
 
-[Unreleased]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v1.0.0-beta.1...HEAD
+[1.0.0-beta.1]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.3...v1.0.0-beta.1
+[0.9.3]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.1...v0.9.2
 [0.9.2-beta.1]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.1...v0.9.2-beta.1
 [0.9.1]: https://github.com/SoftwareSchmied/ha-ambientika-ventilation/compare/v0.9.0...v0.9.1
