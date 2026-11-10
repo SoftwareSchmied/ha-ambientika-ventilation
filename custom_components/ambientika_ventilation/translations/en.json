@@ -69,7 +69,22 @@
     "unsupported_select_option": { "message": "Option {option} is not supported." },
     "device_offline": { "message": "The ventilation unit did not respond to the command. Check that it is online in the Ambientika app." },
     "auth_failed": { "message": "The Ambientika cloud rejected the stored credentials. Reauthenticate the integration." },
-    "set_state_empty": { "message": "Set at least one value." }
+    "set_state_empty": { "message": "Set at least one value." },
+    "schedule_read_only": { "message": "The weekly schedule of this unit is read-only. The account needs the weekly scheduler feature and the unit must report a schedule." },
+    "schedule_write_failed": { "message": "The Ambientika cloud did not accept the schedule change." },
+    "schedule_invalid_id": { "message": "{value} is not a valid identifier." },
+    "schedule_invalid_day": { "message": "{value} is not a valid weekday." },
+    "schedule_invalid_time": { "message": "The {field} time must be a time of day with zero seconds, for example 07:30." },
+    "schedule_time_order": { "message": "The start time must be before the end time on the same day. Time slots cannot cross midnight." },
+    "schedule_invalid_value": { "message": "{value} is not allowed for {field} in a time slot." },
+    "time_slot_overlap": { "message": "The time slot overlaps another time slot on the same day." },
+    "time_slot_not_found": { "message": "This time slot does not exist." },
+    "time_slot_incomplete": { "message": "A new time slot needs a day, a start time, an end time and an operating mode." },
+    "clear_schedule_not_confirmed": { "message": "Turn on the confirmation to delete all time slots." },
+    "calendar_event_not_weekly": { "message": "Only events that repeat weekly on their own weekday can be stored as a time slot, without end date, count or interval." },
+    "calendar_event_not_representable": { "message": "A time slot starts and ends on the same day at a full minute. All-day events cannot be stored." },
+    "calendar_event_mode_missing": { "message": "Name the operating mode in the event title (for example Night) or write mode: night in the description." },
+    "calendar_recurrence_unsupported": { "message": "A single occurrence cannot be changed. Edit or delete the whole weekly event." }
   },
   "entity": {
     "fan": { "ventilation": { "name": "Ventilation", "state_attributes": { "preset_mode": { "state": { "night": "Night" } } } } },
@@ -111,8 +126,9 @@
       "light_sensor_level": { "name": "Light sensor sensitivity", "state": { "off": "Off", "low": "Low", "medium": "Medium" } }
     },
     "switch": { "schedule": { "name": "Schedule control" } },
+    "calendar": { "schedule": { "name": "Schedule" } },
     "button": { "reset_filter": { "name": "Reset filter status" } }
   },
   "options": {"step": {"init": {"title": "Ambientika options", "description": "Choose how often the Ambientika cloud is polled. The unit reports about every 30 seconds, so shorter intervals bring nothing. After a command the integration polls every 30 seconds for three minutes, and it slows down automatically while the cloud is unreachable.", "data": {"scan_interval": "Polling interval"}, "data_description": {"scan_interval": "Seconds between cloud updates (30 to 600)."}}}},
-  "services": {"set_state": {"name": "Set state", "description": "Set the operating mode, fan speed, humidity target and light sensor sensitivity in one command. Only the given values change.", "fields": {"operating_mode": {"name": "Operating mode", "description": "New operating mode."}, "fan_speed": {"name": "Fan speed", "description": "New fan speed; only for modes with a selectable speed."}, "humidity_level": {"name": "Humidity target", "description": "New humidity target; only in Automatic and Surveillance mode."}, "light_sensor_level": {"name": "Light sensor sensitivity", "description": "New light sensor sensitivity; only in Smart and Automatic mode."}}}}
+  "services": {"set_time_slot": {"name": "Set time slot", "description": "Create a weekly time slot, or change an existing one when a time slot identifier is given. Values you leave out stay unchanged. The slot must not overlap another slot on the same day.", "fields": {"slot_id": {"name": "Time slot", "description": "Identifier of an existing time slot to change. Leave empty to create a new one. Use Get schedule to list identifiers."}, "day": {"name": "Day", "description": "Weekday of the time slot."}, "start": {"name": "Start", "description": "Start time. Seconds must be zero."}, "end": {"name": "End", "description": "End time on the same day, after the start. Seconds must be zero."}, "operating_mode": {"name": "Operating mode", "description": "Operating mode of the time slot."}, "fan_speed": {"name": "Fan speed", "description": "Fan speed. Defaults to low for a new time slot. Turbo only if the unit allows it."}, "humidity_level": {"name": "Humidity target", "description": "Humidity target. Defaults to normal for a new time slot."}, "light_sensor_level": {"name": "Light sensor sensitivity", "description": "Light sensor sensitivity. Defaults to off for a new time slot."}}}, "delete_time_slot": {"name": "Delete time slot", "description": "Delete one weekly time slot.", "fields": {"slot_id": {"name": "Time slot", "description": "Identifier of the time slot to delete."}}}, "clear_schedule": {"name": "Clear schedule", "description": "Delete all weekly time slots of the unit. This cannot be undone.", "fields": {"confirm": {"name": "Confirm", "description": "Must be turned on to delete all time slots."}}}, "get_schedule": {"name": "Get schedule", "description": "Return the weekly time slots of the unit, with their identifiers."}, "set_state": {"name": "Set state", "description": "Set the operating mode, fan speed, humidity target and light sensor sensitivity in one command. Only the given values change.", "fields": {"operating_mode": {"name": "Operating mode", "description": "New operating mode."}, "fan_speed": {"name": "Fan speed", "description": "New fan speed; only for modes with a selectable speed."}, "humidity_level": {"name": "Humidity target", "description": "New humidity target; only in Automatic and Surveillance mode."}, "light_sensor_level": {"name": "Light sensor sensitivity", "description": "New light sensor sensitivity; only in Smart and Automatic mode."}}}}
 }

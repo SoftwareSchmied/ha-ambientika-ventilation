@@ -31,7 +31,9 @@ from .api import (
     AmbientikaHouseNotFoundError,
     AmbientikaNotFoundError,
     AmbientikaResponseError,
+    AmbientikaScheduleOverlapError,
     AmbientikaStatusUnavailableError,
+    AmbientikaTimeSlotNotFoundError,
     describe_error,
 )
 from .const import (
@@ -58,12 +60,23 @@ from .models import (
     AmbientikaDeviceMetadata,
     AmbientikaSchedule,
     AmbientikaStatus,
+    AmbientikaTimeSlot,
     is_controllable_device,
     parse_house_status_metadata,
     parse_house_statuses,
     parse_houses,
     parse_schedule,
     parse_status,
+    turbo_usable,
+)
+from .schedule import (
+    DEFAULT_FAN_SPEED,
+    DEFAULT_HUMIDITY_LEVEL,
+    DEFAULT_LIGHT_SENSOR_LEVEL,
+    ScheduleValidationError,
+    parse_clock,
+    parse_day,
+    slot_interval,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -1187,6 +1200,228 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             # The official app also shows the filter as good right after a reset.
             self._apply_status(serial, replace(base, filter_status="Good"))
 
+    # ------------------------------------------------------------------
+    # Schedule editing
+    # ------------------------------------------------------------------
+
+    def schedule_writable(self, serial: str) -> bool:
+        """Return whether time slots of a device may be changed.
+
+        As in the official app, the account needs the ``weeklyScheduler``
+        feature flag and the device must report a schedule state.
+        """
+        device_data = self.data.devices.get(serial) if self.data else None
+        if device_data is None or device_data.device.device_id is None:
+            return False
+        status = device_data.status
+        return (
+            is_controllable_device(device_data.device, status)
+            and self._feature_flags.get("weeklyScheduler") is True
+            and status is not None
+            and status.schedule_state not in (None, "NotAvailable")
+        )
+
+    def _schedule_target(self, serial: str) -> tuple[AmbientikaDeviceData, int]:
+        """Return the device data and cloud id of a device that may be edited."""
+        device_data = self.data.devices.get(serial) if self.data else None
+        if device_data is None or not is_controllable_device(
+            device_data.device, device_data.status
+        ):
+            raise validation_error("device_not_controllable")
+        device_id = device_data.device.device_id
+        if device_id is None or not self.schedule_writable(serial):
+            raise validation_error("schedule_read_only")
+        return device_data, device_id
+
+    def _slot_arguments(
+        self, device_data: AmbientikaDeviceData, fields: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Return the validation context and defaults for a slot."""
+        status = device_data.status
+        light_default = (
+            "NotAvailable"
+            if status is not None and status.light_sensor_level == "NotAvailable"
+            else DEFAULT_LIGHT_SENSOR_LEVEL
+        )
+        return {
+            "allowed_modes": operating_modes_for_device(device_data.device.device_type),
+            "allow_turbo": turbo_usable(status, self._feature_flags),
+            "fan_speed": DEFAULT_FAN_SPEED,
+            "humidity_level": DEFAULT_HUMIDITY_LEVEL,
+            "light_sensor_level": light_default,
+            **{key: value for key, value in fields.items() if value is not None},
+        }
+
+    async def async_create_time_slot(self, serial: str, **fields: Any) -> None:
+        """Add a weekly time slot and re-read the schedule.
+
+        ``fields`` are ``day_of_week``, ``start_time``, ``end_time``,
+        ``operating_mode`` and optionally the fan speed, humidity target and
+        light sensor level (defaults apply otherwise).
+        """
+        device_data, device_id = self._schedule_target(serial)
+        schedule = device_data.schedule
+        arguments = self._slot_arguments(device_data, fields)
+        async with self._write_lock(serial):
+            try:
+                await self.api.async_create_time_slot(
+                    device_id,
+                    schedule_id=schedule.schedule_id if schedule else None,
+                    existing_slots=schedule.time_slots if schedule else (),
+                    **arguments,
+                )
+            except AmbientikaScheduleOverlapError as err:
+                # A retried request may meet the slot its lost first attempt
+                # created; an identical new slot then means success.
+                if not await self._async_slot_exists(serial, device_id, arguments):
+                    raise self._schedule_error(serial, err) from err
+            except (AmbientikaApiError, ScheduleValidationError) as err:
+                raise self._schedule_error(serial, err) from err
+            await self._async_reload_schedule(serial, device_id)
+
+    async def async_update_time_slot(
+        self, serial: str, slot_id: int, **fields: Any
+    ) -> None:
+        """Change a time slot; values that are not given are kept."""
+        device_data, device_id = self._schedule_target(serial)
+        schedule = device_data.schedule
+        existing = next(
+            (
+                slot
+                for slot in (schedule.time_slots if schedule else ())
+                if slot.slot_id == slot_id
+            ),
+            None,
+        )
+        if existing is None:
+            raise validation_error("time_slot_not_found")
+        interval = slot_interval(existing)
+        allow_turbo = turbo_usable(device_data.status, self._feature_flags)
+        kept: dict[str, Any] = {
+            "day_of_week": interval[0] if interval else None,
+            "start_time": interval[1] if interval else None,
+            "end_time": interval[2] if interval else None,
+            "operating_mode": existing.operating_mode,
+            "fan_speed": _kept_fan_speed(existing.fan_speed, allow_turbo),
+            "humidity_level": existing.humidity_level,
+            "light_sensor_level": existing.light_sensor_level,
+        }
+        arguments = self._slot_arguments(
+            device_data,
+            {
+                **kept,
+                **{key: value for key, value in fields.items() if value is not None},
+            },
+        )
+        async with self._write_lock(serial):
+            try:
+                await self.api.async_update_time_slot(
+                    device_id,
+                    slot_id,
+                    schedule_id=schedule.schedule_id if schedule else None,
+                    existing_slots=schedule.time_slots if schedule else (),
+                    **arguments,
+                )
+            except (AmbientikaApiError, ScheduleValidationError) as err:
+                raise self._schedule_error(serial, err) from err
+            await self._async_reload_schedule(serial, device_id)
+
+    async def async_delete_time_slot(self, serial: str, slot_id: int) -> None:
+        """Delete a time slot; a slot the cloud no longer has counts as deleted."""
+        _device_data, device_id = self._schedule_target(serial)
+        async with self._write_lock(serial):
+            try:
+                await self.api.async_delete_time_slot(device_id, slot_id)
+            except AmbientikaTimeSlotNotFoundError:
+                LOGGER.debug("Time slot already deleted for %s", mask_serial(serial))
+            except (AmbientikaApiError, ScheduleValidationError) as err:
+                raise self._schedule_error(serial, err) from err
+            await self._async_reload_schedule(serial, device_id)
+
+    async def async_clear_schedule(self, serial: str) -> int:
+        """Delete every time slot and return how many were deleted."""
+        device_data, device_id = self._schedule_target(serial)
+        schedule = device_data.schedule
+        slot_ids = [
+            slot.slot_id
+            for slot in (schedule.time_slots if schedule else ())
+            if slot.slot_id is not None
+        ]
+        deleted = 0
+        async with self._write_lock(serial):
+            try:
+                for slot_id in slot_ids:
+                    try:
+                        await self.api.async_delete_time_slot(device_id, slot_id)
+                    except AmbientikaTimeSlotNotFoundError:
+                        continue
+                    deleted += 1
+            except (AmbientikaApiError, ScheduleValidationError) as err:
+                raise self._schedule_error(serial, err) from err
+            finally:
+                await self._async_reload_schedule(serial, device_id)
+        return deleted
+
+    def _schedule_error(self, serial: str, err: Exception) -> Exception:
+        """Translate a failed schedule request into a Home Assistant error."""
+        if isinstance(err, ScheduleValidationError):
+            return validation_error(err.code, placeholders=err.placeholders)
+        if isinstance(err, AmbientikaScheduleOverlapError):
+            return validation_error("time_slot_overlap")
+        if isinstance(err, AmbientikaTimeSlotNotFoundError):
+            return validation_error("time_slot_not_found")
+        if isinstance(err, AmbientikaAuthError):
+            self.config_entry.async_start_reauth(self.hass)
+            return action_error("auth_failed")
+        if isinstance(err, AmbientikaDeviceOfflineError):
+            return action_error("device_offline")
+        LOGGER.debug(
+            "Ambientika schedule change for %s failed: %s",
+            mask_serial(serial),
+            describe_error(err),
+        )
+        return action_error("schedule_write_failed")
+
+    async def _async_fetch_schedule(
+        self, serial: str, device_id: int
+    ) -> AmbientikaSchedule | None:
+        """Read one schedule; a failure only marks it for the next poll."""
+        try:
+            return parse_schedule(await self.api.async_schedule(device_id))
+        except AmbientikaApiError as err:
+            LOGGER.debug(
+                "Ambientika schedule read-back for %s failed: %s",
+                mask_serial(serial),
+                describe_error(err),
+            )
+            self._schedule_due.add(serial)
+            return None
+
+    async def _async_reload_schedule(self, serial: str, device_id: int) -> None:
+        """Re-read the schedule after a change and publish it."""
+        schedule = await self._async_fetch_schedule(serial, device_id)
+        if schedule is None or self.data is None or serial not in self.data.devices:
+            return
+        self._schedules[serial] = schedule
+        devices = dict(self.data.devices)
+        devices[serial] = replace(devices[serial], schedule=schedule)
+        self.async_set_updated_data(replace(self.data, devices=devices))
+
+    async def _async_slot_exists(
+        self, serial: str, device_id: int, fields: dict[str, Any]
+    ) -> bool:
+        """Return whether the cloud now holds a new slot with these values."""
+        known = self._schedules.get(serial)
+        before = {slot.slot_id for slot in known.time_slots} if known else set()
+        schedule = await self._async_fetch_schedule(serial, device_id)
+        if schedule is None or not any(
+            slot.slot_id not in before and _slot_matches(slot, fields)
+            for slot in schedule.time_slots
+        ):
+            return False
+        await self._async_reload_schedule(serial, device_id)
+        return True
+
 
 def _with_expected(
     base: AmbientikaStatus, expected: dict[str, str]
@@ -1206,3 +1441,29 @@ def _consume_exception(future: asyncio.Future[None]) -> None:
     """Mark a command outcome as retrieved when every caller went away."""
     if not future.cancelled():
         future.exception()
+
+
+def _slot_matches(slot: AmbientikaTimeSlot, fields: dict[str, Any]) -> bool:
+    """Return whether a stored slot has exactly the requested values."""
+    interval = slot_interval(slot)
+    return (
+        interval is not None
+        and interval[0] == parse_day(fields["day_of_week"])
+        and interval[1] == parse_clock(fields["start_time"])
+        and interval[2] == parse_clock(fields["end_time"])
+        and slot.operating_mode == fields["operating_mode"]
+        and slot.fan_speed == fields["fan_speed"]
+        and slot.humidity_level == fields["humidity_level"]
+        and slot.light_sensor_level == fields["light_sensor_level"]
+    )
+
+
+def _kept_fan_speed(value: str | None, allow_turbo: bool) -> str | None:
+    """Return a stored fan speed that may be written back, else ``None``.
+
+    The cloud never takes ``Night``. Turbo without the unit's permission is
+    written as High, as the official app shows it.
+    """
+    if value == "Turbo" and not allow_turbo:
+        return "High"
+    return value if value in WRITABLE_FAN_SPEEDS else None

@@ -69,7 +69,22 @@
     "unsupported_select_option": { "message": "Die Option {option} wird nicht unterstützt." },
     "device_offline": { "message": "Das Lüftungsgerät hat nicht auf den Befehl reagiert. Prüfe in der Ambientika-App, ob es online ist." },
     "auth_failed": { "message": "Die Ambientika-Cloud hat die gespeicherten Zugangsdaten abgelehnt. Melde die Integration erneut an." },
-    "set_state_empty": { "message": "Gib mindestens einen Wert an." }
+    "set_state_empty": { "message": "Gib mindestens einen Wert an." },
+    "schedule_read_only": { "message": "Der Wochenzeitplan dieses Geräts ist schreibgeschützt. Das Konto braucht die Wochenzeitplan-Funktion und das Gerät muss einen Zeitplan melden." },
+    "schedule_write_failed": { "message": "Die Ambientika-Cloud hat die Zeitplanänderung nicht angenommen." },
+    "schedule_invalid_id": { "message": "{value} ist keine gültige Kennung." },
+    "schedule_invalid_day": { "message": "{value} ist kein gültiger Wochentag." },
+    "schedule_invalid_time": { "message": "Die {field}-Zeit muss eine Uhrzeit ohne Sekunden sein, zum Beispiel 07:30." },
+    "schedule_time_order": { "message": "Die Startzeit muss am selben Tag vor der Endzeit liegen. Zeitfenster können nicht über Mitternacht gehen." },
+    "schedule_invalid_value": { "message": "{value} ist für {field} in einem Zeitfenster nicht erlaubt." },
+    "time_slot_overlap": { "message": "Das Zeitfenster überschneidet sich mit einem anderen Zeitfenster am selben Tag." },
+    "time_slot_not_found": { "message": "Dieses Zeitfenster existiert nicht." },
+    "time_slot_incomplete": { "message": "Ein neues Zeitfenster braucht Tag, Startzeit, Endzeit und Betriebsart." },
+    "clear_schedule_not_confirmed": { "message": "Schalte die Bestätigung ein, um alle Zeitfenster zu löschen." },
+    "calendar_event_not_weekly": { "message": "Nur Termine, die wöchentlich an ihrem eigenen Wochentag wiederkehren, lassen sich als Zeitfenster speichern, ohne Enddatum, Anzahl oder Intervall." },
+    "calendar_event_not_representable": { "message": "Ein Zeitfenster beginnt und endet am selben Tag zur vollen Minute. Ganztägige Termine lassen sich nicht speichern." },
+    "calendar_event_mode_missing": { "message": "Nenne die Betriebsart im Titel (zum Beispiel Nacht) oder schreibe mode: night in die Beschreibung." },
+    "calendar_recurrence_unsupported": { "message": "Ein einzelnes Vorkommen lässt sich nicht ändern. Bearbeite oder lösche den gesamten wöchentlichen Termin." }
   },
   "entity": {
     "fan": { "ventilation": { "name": "Lüftung", "state_attributes": { "preset_mode": { "state": { "night": "Nacht" } } } } },
@@ -111,8 +126,9 @@
       "light_sensor_level": { "name": "Lichtsensor-Empfindlichkeit", "state": { "off": "Aus", "low": "Niedrig", "medium": "Mittel" } }
     },
     "switch": { "schedule": { "name": "Zeitplansteuerung" } },
+    "calendar": { "schedule": { "name": "Zeitplan" } },
     "button": { "reset_filter": { "name": "Filterstatus zurücksetzen" } }
   },
   "options": {"step": {"init": {"title": "Ambientika-Optionen", "description": "Lege fest, wie oft die Ambientika-Cloud abgefragt wird. Das Gerät meldet etwa alle 30 Sekunden, kürzere Abstände bringen nichts. Nach einem Befehl fragt die Integration drei Minuten lang alle 30 Sekunden ab und wird bei einer nicht erreichbaren Cloud automatisch langsamer.", "data": {"scan_interval": "Abfrageintervall"}, "data_description": {"scan_interval": "Sekunden zwischen den Cloud-Abfragen (30 bis 600)."}}}},
-  "services": {"set_state": {"name": "Zustand setzen", "description": "Setzt Betriebsart, Lüfterstufe, Feuchteziel und Lichtsensor-Empfindlichkeit in einem Befehl. Nur die angegebenen Werte ändern sich.", "fields": {"operating_mode": {"name": "Betriebsart", "description": "Neue Betriebsart."}, "fan_speed": {"name": "Lüfterstufe", "description": "Neue Lüfterstufe; nur in Betriebsarten mit wählbarer Stufe."}, "humidity_level": {"name": "Feuchteziel", "description": "Neues Feuchteziel; nur in den Betriebsarten Automatik und Überwachung."}, "light_sensor_level": {"name": "Lichtsensor-Empfindlichkeit", "description": "Neue Lichtsensor-Empfindlichkeit; nur in den Betriebsarten Smart und Automatik."}}}}
+  "services": {"set_time_slot": {"name": "Zeitfenster setzen", "description": "Legt ein wöchentliches Zeitfenster an oder ändert ein vorhandenes, wenn eine Kennung angegeben ist. Nicht angegebene Werte bleiben unverändert. Das Zeitfenster darf sich nicht mit einem anderen am selben Tag überschneiden.", "fields": {"slot_id": {"name": "Zeitfenster", "description": "Kennung eines vorhandenen Zeitfensters, das geändert wird. Leer lassen, um ein neues anzulegen. Mit Zeitplan abrufen lassen sich die Kennungen auflisten."}, "day": {"name": "Day", "description": "Wochentag des Zeitfensters."}, "start": {"name": "Start", "description": "Startzeit. Sekunden müssen null sein."}, "end": {"name": "Ende", "description": "Endzeit am selben Tag, nach dem Start. Sekunden müssen null sein."}, "operating_mode": {"name": "Betriebsart", "description": "Betriebsart des Zeitfensters."}, "fan_speed": {"name": "Lüfterstufe", "description": "Lüfterstufe. Für ein neues Zeitfenster ist niedrig voreingestellt. Turbo nur, wenn das Gerät es erlaubt."}, "humidity_level": {"name": "Feuchteziel", "description": "Feuchteziel. Für ein neues Zeitfenster ist normal voreingestellt."}, "light_sensor_level": {"name": "Lichtsensor-Empfindlichkeit", "description": "Lichtsensor-Empfindlichkeit. Für ein neues Zeitfenster ist aus voreingestellt."}}}, "delete_time_slot": {"name": "Zeitfenster löschen", "description": "Löscht ein wöchentliches Zeitfenster.", "fields": {"slot_id": {"name": "Zeitfenster", "description": "Kennung des zu löschenden Zeitfensters."}}}, "clear_schedule": {"name": "Zeitplan leeren", "description": "Löscht alle wöchentlichen Zeitfenster des Geräts. Das lässt sich nicht rückgängig machen.", "fields": {"confirm": {"name": "Bestätigen", "description": "Muss eingeschaltet sein, um alle Zeitfenster zu löschen."}}}, "get_schedule": {"name": "Zeitplan abrufen", "description": "Gibt die wöchentlichen Zeitfenster des Geräts mit ihren Kennungen zurück."}, "set_state": {"name": "Zustand setzen", "description": "Setzt Betriebsart, Lüfterstufe, Feuchteziel und Lichtsensor-Empfindlichkeit in einem Befehl. Nur die angegebenen Werte ändern sich.", "fields": {"operating_mode": {"name": "Betriebsart", "description": "Neue Betriebsart."}, "fan_speed": {"name": "Lüfterstufe", "description": "Neue Lüfterstufe; nur in Betriebsarten mit wählbarer Stufe."}, "humidity_level": {"name": "Feuchteziel", "description": "Neues Feuchteziel; nur in den Betriebsarten Automatik und Überwachung."}, "light_sensor_level": {"name": "Lichtsensor-Empfindlichkeit", "description": "Neue Lichtsensor-Empfindlichkeit; nur in den Betriebsarten Smart und Automatik."}}}}
 }

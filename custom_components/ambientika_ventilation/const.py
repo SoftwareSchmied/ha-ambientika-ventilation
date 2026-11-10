@@ -44,6 +44,7 @@ PLATFORMS: Final = (
     Platform.SELECT,
     Platform.SWITCH,
     Platform.BUTTON,
+    Platform.CALENDAR,
 )
 
 OPERATING_MODES: Final = (
