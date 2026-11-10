@@ -100,6 +100,67 @@ No raw device payload or firmware matrix was supplied with that report. The
 implementation is covered by synthetic fixtures; validation on additional
 physical master/slave installations remains welcome.
 
+## Local UDP broadcast
+
+Besides the cloud API, the master device of each zone broadcasts its state on
+the local network. This source is passive (receive only), carries no
+temperature or humidity, and is informative only: the cloud stays the source of
+truth.
+
+### Frame format
+
+Seven bytes: `65 3Z MS <house id>`.
+
+| Byte | Meaning |
+| --- | --- |
+| 0 | Header `0x65` |
+| 1 | `0x30 \| zone index` |
+| 2 | `MS`: coupling (high nibble `M`), direction and stage (low nibble `S`) |
+| 3-6 | House id, 4 bytes big endian |
+
+The frame is sent as a UDP broadcast to port `45000 + zone` from source port
+`46000 + zone`. One master per zone sends. A heartbeat repeats the frame every
+26.97 s (+/- 1 s); every state change sends an extra frame immediately. The
+device reacts about 6 s after a cloud command.
+
+`S`: bits 3-2 are the direction (`00` stopped or reversing, `01` exhaust, `10`
+intake, `11` unknown); bits 1-0 are the fan stage (0 night, 1 low, 2 medium,
+3 high). The stage is kept while stopped, so "stopped" does not mean "off".
+
+`M` is the coupling of the slaves relative to the master:
+
+| `M` | Slaves | Modes |
+| --- | --- | --- |
+| 0 | idle | off or idle |
+| 2 | opposite | heat recovery, night, smart, flow modes |
+| 3 | same | exhaust, intake, surveillance, humidity-alarm exhaust, timed exhaust |
+| other | unknown | kept raw |
+
+In heat recovery the direction alternates every 70 s, including about 10 s
+stopped while reversing.
+
+### Plausibility rules
+
+Frames are accepted only when the length is 7, the header is `0x65`, the zone
+nibble matches the destination port and the source port is `46000 + zone`, the
+house id and zone are configured, and the sender host is the one pinned for the
+zone (a new host is accepted only after the zone was lost for 5 minutes). More
+than 10 frames in 10 s per zone are dropped. Rejected frames never change
+state; they are counted per reason in the diagnostics.
+
+Freshness per zone: fresh below 3 heartbeats (about 81 s), stale from 81 s,
+lost from 300 s, never before the first frame.
+
+### Network requirements
+
+- Home Assistant OS and Supervised: works out of the box.
+- Docker: only with `network_mode: host`, because broadcasts are not routed
+  into bridge networks.
+- Separate VLANs: broadcast forwarding (or a UDP broadcast relay) from the
+  device VLAN to Home Assistant is required for ports 45000 and up.
+- Other listeners (for example an add-on) may use the same ports in parallel;
+  the sockets are opened with address and port reuse.
+
 ## Deliberately excluded writes
 
 Factory/device reset, role configuration, house/room/zone mutation, email and
