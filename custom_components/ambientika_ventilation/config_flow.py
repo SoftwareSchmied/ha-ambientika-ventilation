@@ -65,6 +65,36 @@ class NoDevicesError(AmbientikaApiError):
     """The Ambientika account contains no usable devices."""
 
 
+async def _async_try_validate(
+    hass: HomeAssistant, user_input: dict[str, Any], errors: dict[str, str]
+) -> dict[str, Any] | None:
+    """Validate credentials and map every failure to a frontend error key."""
+    try:
+        return await _validate_input(hass, user_input)
+    except AmbientikaAuthError:
+        errors["base"] = "invalid_auth"
+    except NoDevicesError:
+        errors["base"] = "no_devices"
+    except AmbientikaResponseError:
+        errors["base"] = "invalid_response"
+    except AmbientikaApiError:
+        errors["base"] = "cannot_connect"
+    except Exception:
+        LOGGER.exception("Unexpected error validating Ambientika credentials")
+        errors["base"] = "unknown"
+    return None
+
+
+def _credentials_schema(username: str) -> vol.Schema:
+    """Return the credential form prefilled with the stored email address."""
+    return vol.Schema(
+        {
+            vol.Required(CONF_USERNAME, default=username): str,
+            vol.Required(CONF_PASSWORD): str,
+        }
+    )
+
+
 class AmbientikaConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle an Ambientika config flow."""
 
@@ -77,20 +107,8 @@ class AmbientikaConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle initial account setup."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            try:
-                data = await _validate_input(self.hass, user_input)
-            except AmbientikaAuthError:
-                errors["base"] = "invalid_auth"
-            except NoDevicesError:
-                errors["base"] = "no_devices"
-            except AmbientikaResponseError:
-                errors["base"] = "invalid_response"
-            except AmbientikaApiError:
-                errors["base"] = "cannot_connect"
-            except Exception:
-                LOGGER.exception("Unexpected error validating Ambientika credentials")
-                errors["base"] = "unknown"
-            else:
+            data = await _async_try_validate(self.hass, user_input, errors)
+            if data is not None:
                 await self.async_set_unique_id(f"{DOMAIN}_{data[CONF_USER_ID]}")
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(
@@ -114,20 +132,8 @@ class AmbientikaConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         reauth_entry = self._get_reauth_entry()
         if user_input is not None:
-            try:
-                data = await _validate_input(self.hass, user_input)
-            except AmbientikaAuthError:
-                errors["base"] = "invalid_auth"
-            except NoDevicesError:
-                errors["base"] = "no_devices"
-            except AmbientikaResponseError:
-                errors["base"] = "invalid_response"
-            except AmbientikaApiError:
-                errors["base"] = "cannot_connect"
-            except Exception:
-                LOGGER.exception("Unexpected error reauthenticating Ambientika")
-                errors["base"] = "unknown"
-            else:
+            data = await _async_try_validate(self.hass, user_input, errors)
+            if data is not None:
                 if data[CONF_USER_ID] != reauth_entry.data.get(CONF_USER_ID):
                     errors["base"] = "wrong_account"
                 else:
@@ -136,17 +142,28 @@ class AmbientikaConfigFlow(ConfigFlow, domain=DOMAIN):
                         data=data,
                     )
 
-        schema = vol.Schema(
-            {
-                vol.Required(
-                    CONF_USERNAME,
-                    default=reauth_entry.data.get(CONF_USERNAME, ""),
-                ): str,
-                vol.Required(CONF_PASSWORD): str,
-            }
-        )
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=schema,
+            data_schema=_credentials_schema(reauth_entry.data.get(CONF_USERNAME, "")),
+            errors=errors,
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Replace the stored credentials of the same Ambientika account."""
+        errors: dict[str, str] = {}
+        entry = self._get_reconfigure_entry()
+        if user_input is not None:
+            data = await _async_try_validate(self.hass, user_input, errors)
+            if data is not None:
+                if data[CONF_USER_ID] != entry.data.get(CONF_USER_ID):
+                    errors["base"] = "wrong_account"
+                else:
+                    return self.async_update_reload_and_abort(entry, data=data)
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=_credentials_schema(entry.data.get(CONF_USERNAME, "")),
             errors=errors,
         )

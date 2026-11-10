@@ -27,22 +27,59 @@ that every firmware or account supports every field.
 | `/Users/feature-flags` | booleans | Server features | Read | Start + 6 h | Diagnostics | N/A |
 | `/Users/refresh-token` | token | JWT expiry | Read | Before expiry | Internal | N/A |
 
-The client additionally knows that HTTP 401 requires authentication recovery,
-403 means unavailable capability, 404 means unsupported resource, 429 requires
-backoff, and 5xx is temporary. Unsupported per-device status endpoints are not
+The client classifies unsuccessful responses as follows:
+
+| Response | Meaning | Handling |
+| --- | --- | --- |
+| 401 | Token or credentials rejected | One reauthentication, then reauth flow |
+| 400 `"Device not found"` on device status | Serial unknown to the cloud | Skipped until early rediscovery |
+| other 400 | Validation error (also during login) | Generic response error, never "invalid credentials" |
+| 403 | Capability unavailable | Skipped until rediscovery |
+| 404 `"Status packet not found!"` on device status | Unit offline (no current packet) | Device unavailable, still polled every cycle |
+| 404 `"House not found"` | House deleted or foreign | Early rediscovery |
+| 404 problem+json on `/Schedule/{id}` | No schedule configured | No schedule entities |
+| other 404 | Endpoint not supported | Skipped until rediscovery |
+| 406 on `change-mode` / `reset-filter` | Device did not acknowledge | Translated "device offline" error, no retry |
+| 406 on house status | House has no configured master | Individual device reads |
+| 429 / 5xx / timeout / transport error | Temporary | Bounded retries with backoff |
+
+The failure kind, HTTP status, and cloud `traceId` are counted and logged
+without identifiers. When a house status request fails temporarily, one device
+per house probes whether individual reads still work before the remaining
+devices are requested. Failed discovery is retried after 5, 10, and 30 minutes,
+up to six hours. Unsupported per-device status endpoints are not
 retried during every polling cycle. They are probed again after successful
 device discovery (normally every six hours), and can recover earlier through
 a usable house-batch status packet.
+
+A unit that loses power disappears from `/Device/house-devices-status` (which
+still answers 200) after about 2.5–3 minutes, and `/Device/device-status` then
+answers 404 `"Status packet not found!"`. The status returns within seconds of
+the unit reconnecting. The transition to offline and the recovery are each
+logged once.
+
+Accepted is not delivered: `/Device/change-mode` answered 200 for a unit that
+was powered off. The 406 mapping is kept, but the integration does not rely on
+it. Accepted commands appear in the cloud status after about 0.2–3.1 s (median
+2.1 s), so an immediate read-back usually returns the previous state. The
+integration reads back after 3 s, retries once after another 3 s, and
+otherwise shows the written values until the next poll corrects them.
 
 The Android app sends weekday values as `0` (Sunday) through `6` (Saturday),
 while the OpenAPI document declares weekday names. Both forms are accepted.
 Likewise, both the deployed `signalStrenght` spelling and a future corrected
 `signalStrength` field are parsed. `FanSpeed.Night` is retained for reading
-legacy packets but is never written: Night is an operating mode in the app.
+packets but is never written: Night is an operating mode in the app. Units
+report it as the automatic night speed in Auto and Smart mode. Every write
+sends a complete state, so a reported `Night` speed is replaced by the last
+writable speed of that unit, or `Low` if none was seen yet.
 
 The cloud API does not document a physical unit or scale for signal strength,
 and observed values exceed 200. The integration therefore exposes the integer
-as a unitless measurement without presenting it as percent or dBm.
+as a unitless measurement without presenting it as percent or dBm. The value
+is likely the device RSSI as an unsigned byte, so dBm ≈ raw − 256: raw 202 and
+204 compared with −66 and −62 dBm on the access point side, a consistent offset
+of 10–12 dB. This offset to the AP-side RSSI is unverified.
 
 Non-Gemini zones are controlled through their master device. Slave units do not
 receive duplicate controls. Gemini devices are individually controlled and use
