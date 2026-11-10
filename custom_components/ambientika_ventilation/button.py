@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import AmbientikaRuntimeData
+from .coordinator import AmbientikaCoordinator
 from .entity import AmbientikaEntity
 from .models import is_controllable_device
 
@@ -45,7 +44,7 @@ async def async_setup_entry(
             known.update(serials)
 
     add_new_entities()
-    entry.async_on_unload(coordinator.async_add_listener(add_new_entities))
+    entry.async_on_unload(coordinator.async_add_topology_listener(add_new_entities))
 
 
 class AmbientikaResetFilterButton(AmbientikaEntity, ButtonEntity):
@@ -53,7 +52,7 @@ class AmbientikaResetFilterButton(AmbientikaEntity, ButtonEntity):
 
     entity_description = RESET_FILTER
 
-    def __init__(self, coordinator: Any, serial: str) -> None:
+    def __init__(self, coordinator: AmbientikaCoordinator, serial: str) -> None:
         """Initialize the button."""
         super().__init__(coordinator, serial, RESET_FILTER.key)
 

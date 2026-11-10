@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.config_entries import ConfigEntry
@@ -19,6 +18,7 @@ from .const import (
     OPERATING_MODES,
     operating_modes_for_device,
 )
+from .coordinator import AmbientikaCoordinator
 from .entity import AmbientikaEntity
 from .errors import validation_error
 from .models import AmbientikaStatus, is_controllable_device
@@ -94,7 +94,7 @@ async def async_setup_entry(
             async_add_entities(entities)
 
     add_new_entities()
-    entry.async_on_unload(coordinator.async_add_listener(add_new_entities))
+    entry.async_on_unload(coordinator.async_add_topology_listener(add_new_entities))
 
 
 class AmbientikaSelect(AmbientikaEntity, SelectEntity):
@@ -104,34 +104,43 @@ class AmbientikaSelect(AmbientikaEntity, SelectEntity):
 
     def __init__(
         self,
-        coordinator: Any,
+        coordinator: AmbientikaCoordinator,
         serial: str,
         description: AmbientikaSelectDescription,
     ) -> None:
         """Initialize the select."""
         super().__init__(coordinator, serial, description.key)
         self.entity_description = description
-        api_options = description.api_options
-        if description.key == "operating_mode":
-            status = self.status
-            device_type = self.device_data.device.device_type or (
-                status.device_type if status else None
-            )
-            api_options = operating_modes_for_device(device_type)
-        self._attr_options = [API_TO_HA[value] for value in api_options]
-        self._api_by_option = {API_TO_HA[value]: value for value in api_options}
+
+    @property
+    def _api_options(self) -> tuple[str, ...]:
+        """Return the API values offered now (modes depend on the device type)."""
+        if self.entity_description.key != "operating_mode":
+            return self.entity_description.api_options
+        status = self.status
+        device_type = self.device_data.device.device_type or (
+            status.device_type if status else None
+        )
+        return operating_modes_for_device(device_type)
+
+    @property
+    def options(self) -> list[str]:
+        """Return the options for the current device data."""
+        return [API_TO_HA[value] for value in self._api_options]
 
     @property
     def current_option(self) -> str | None:
-        """Return the normalized current API option."""
+        """Return the current option, or unknown for values that cannot be chosen."""
         if self.status is None:
             return None
         value = self.entity_description.value_fn(self.status)
-        return API_TO_HA.get(value) if value is not None else None
+        option = API_TO_HA.get(value) if value is not None else None
+        return option if option in self.options else None
 
     async def async_select_option(self, option: str) -> None:
         """Validate, write, and read back a selected option."""
-        if option not in self._api_by_option:
+        api_by_option = {API_TO_HA[value]: value for value in self._api_options}
+        if option not in api_by_option:
             raise validation_error(
                 "unsupported_select_option",
                 placeholders={"option": option},
@@ -139,6 +148,6 @@ class AmbientikaSelect(AmbientikaEntity, SelectEntity):
         await self.coordinator.async_write_state(
             self._serial,
             **{  # type: ignore[arg-type]
-                self.entity_description.write_field: self._api_by_option[option]
+                self.entity_description.write_field: api_by_option[option]
             },
         )

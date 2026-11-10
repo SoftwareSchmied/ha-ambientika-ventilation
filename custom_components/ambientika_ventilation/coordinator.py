@@ -5,13 +5,19 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections import deque
 from collections.abc import Callable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    ServiceValidationError,
+)
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import (
@@ -29,11 +35,16 @@ from .api import (
     describe_error,
 )
 from .const import (
+    CONF_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DISCOVERY_INTERVAL,
     DOMAIN,
+    EVENT_DEVICE_CHANGED,
+    FAST_POLL_DURATION,
     HUMIDITY_LEVELS,
     LIGHT_SENSOR_LEVELS,
+    MAX_BACKOFF_INTERVAL,
+    MIN_SCAN_INTERVAL,
     OPERATING_MODES,
     WRITABLE_FAN_SPEEDS,
     mode_allows_setting,
@@ -44,9 +55,11 @@ from .models import (
     AmbientikaData,
     AmbientikaDevice,
     AmbientikaDeviceData,
+    AmbientikaDeviceMetadata,
     AmbientikaSchedule,
     AmbientikaStatus,
     is_controllable_device,
+    parse_house_status_metadata,
     parse_house_statuses,
     parse_houses,
     parse_schedule,
@@ -63,10 +76,31 @@ DISCOVERY_RETRY_DELAYS = (
 )
 MAX_FAILURE_CAUSES = 10
 
+# A device whose status endpoint answers 403/404 is probed again after 1, 2, 5
+# and 15 minutes and only reported as unsupported after this many consecutive
+# failures, so that a short outage does not disable it until the next discovery.
+DEVICE_RETRY_DELAYS = (60.0, 120.0, 300.0, 900.0)
+UNSUPPORTED_AFTER_FAILURES = 4
+
 # The cloud reflects an accepted command after about 0.2-3.1 s (median 2.1 s);
 # an immediate read-back usually still returns the previous state.
 READBACK_DELAY = 3.0
 READBACK_ATTEMPTS = 2
+# Commands arriving within this window are merged into one request.
+WRITE_BATCH_DELAY = 0.4
+# A poll started this soon after a command may still carry the old state.
+STATUS_SETTLE_TIME = 3.0
+
+MAX_CYCLE_HISTORY = 20
+MAX_FIRMWARE_HISTORY = 10
+DEVICE_METADATA_FIELDS = (
+    "name",
+    "role",
+    "micro_firmware",
+    "radio_firmware",
+    "radio_at_firmware",
+    "zone_index",
+)
 
 # Writable values the official app may report but never accepts back (for
 # example the automatic "Night" fan speed) are replaced by the last value seen
@@ -92,6 +126,30 @@ def mask_serial(serial: str) -> str:
     return f"…{serial[-4:]}" if len(serial) >= 4 else "…"
 
 
+def firmware_text(device: AmbientikaDevice) -> str | None:
+    """Return the combined firmware versions shown in the device registry."""
+    parts = (device.micro_firmware, device.radio_firmware, device.radio_at_firmware)
+    return " / ".join(part for part in parts if part) or None
+
+
+@dataclass(slots=True)
+class _PendingWrite:
+    """Commands for one device that are collected before they are sent."""
+
+    fields: dict[str, Any]
+    future: asyncio.Future[None]
+
+
+@dataclass(frozen=True, slots=True)
+class _WritePlan:
+    """A validated command: the complete state to send and what to expect."""
+
+    values: dict[str, str]
+    expected: dict[str, str]
+    schedule_mode: bool
+    status: AmbientikaStatus
+
+
 class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
     """Coordinate discovery, polling, partial failures, and verified writes."""
 
@@ -104,23 +162,49 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         api: AmbientikaApiClient,
     ) -> None:
         """Initialize the account coordinator."""
+        configured = entry.options.get(
+            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL.total_seconds()
+        )
+        try:
+            seconds = max(MIN_SCAN_INTERVAL, int(configured))
+        except (TypeError, ValueError):
+            seconds = int(DEFAULT_SCAN_INTERVAL.total_seconds())
+        self.base_interval = timedelta(seconds=seconds)
         super().__init__(
             hass,
             LOGGER,
             name=DOMAIN,
             config_entry=entry,
-            update_interval=DEFAULT_SCAN_INTERVAL,
+            update_interval=self.base_interval,
+            # Polls without a change do not wake any entity.
+            always_update=False,
         )
         self.api = api
         self._known_devices: dict[str, AmbientikaDevice] = {}
         self._unsupported_status: set[str] = set()
+        self._status_errors: dict[str, int] = {}
+        self._status_retry_at: dict[str, float] = {}
         self._feature_flags: dict[str, bool] = {}
         self._schedules: dict[str, AmbientikaSchedule] = {}
+        self._schedule_due: set[str] = set()
+        self._schedule_states: dict[str, str] = {}
         self._last_discovery: datetime | None = None
         self._failed_devices: set[str] = set()
         self._last_writable: dict[str, dict[str, str]] = {}
         self._cycle_causes: list[str] = []
         self._cycle_offline: set[str] = set()
+        self._cycle_metadata: dict[str, AmbientikaDeviceMetadata] = {}
+        self._cycle_outage = True
+        self._unknown_batch_serials: set[str] = set()
+        self._pending_writes: dict[str, _PendingWrite] = {}
+        self._write_locks: dict[str, asyncio.Lock] = {}
+        self._generation: dict[str, int] = {}
+        self._command_time: dict[str, float] = {}
+        self._fast_until = 0.0
+        self._topology: object = None
+        self._topology_listeners: dict[int, CALLBACK_TYPE] = {}
+        self._topology_listener_id = 0
+        self.consecutive_failures = 0
         self.offline_devices: set[str] = set()
         self.offline_transitions = 0
         self.discovery_failures = 0
@@ -128,14 +212,120 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         self._rediscovery_requested = False
         self.last_successful_update: datetime | None = None
         self.last_update_duration_ms: int | None = None
+        self.cycle_durations_ms: deque[int] = deque(maxlen=MAX_CYCLE_HISTORY)
+        self.firmware_history: dict[str, list[dict[str, Any]]] = {}
+        self.device_changes = 0
+        self.discarded_polls = 0
         self.last_partial_failures = 0
         self.last_failure_causes: tuple[str, ...] = ()
 
+    # ------------------------------------------------------------------
+    # Topology signal
+    # ------------------------------------------------------------------
+
+    @callback
+    def async_add_topology_listener(
+        self, update_callback: CALLBACK_TYPE
+    ) -> CALLBACK_TYPE:
+        """Call back when devices or capabilities that create entities change.
+
+        Platforms use this instead of the generic update listener so that
+        ordinary value updates do not run their discovery code.
+        """
+        self._topology_listener_id += 1
+        listener_id = self._topology_listener_id
+        self._topology_listeners[listener_id] = update_callback
+
+        @callback
+        def remove() -> None:
+            self._topology_listeners.pop(listener_id, None)
+
+        return remove
+
+    @callback
+    def async_update_listeners(self) -> None:
+        """Notify entities and, if the device topology changed, platforms."""
+        super().async_update_listeners()
+        topology = self._topology_signature()
+        if topology == self._topology:
+            return
+        self._topology = topology
+        for listener in list(self._topology_listeners.values()):
+            listener()
+
+    def _topology_signature(self) -> object:
+        """Summarize everything that decides which entities exist."""
+        if self.data is None:
+            return None
+        entries = []
+        for serial, device_data in self.data.devices.items():
+            status = device_data.status
+            entries.append(
+                (
+                    serial,
+                    device_data.device,
+                    status is not None,
+                    status.device_role if status else None,
+                    status.schedule_state not in (None, "NotAvailable")
+                    if status
+                    else None,
+                    status.light_sensor_level not in (None, "NotAvailable")
+                    if status
+                    else None,
+                    device_data.schedule is not None,
+                )
+            )
+        return tuple(sorted(entries, key=lambda entry: entry[0]))
+
+    # ------------------------------------------------------------------
+    # Polling
+    # ------------------------------------------------------------------
+
     async def _async_update_data(self) -> AmbientikaData:
+        """Poll the cloud and adapt the interval to success or failure."""
+        self._cycle_outage = True
+        try:
+            data = await self._async_poll()
+        except UpdateFailed:
+            if self._cycle_outage:
+                self.consecutive_failures += 1
+            self._apply_interval()
+            raise
+        self.consecutive_failures = 0
+        self._apply_interval()
+        return data
+
+    def _apply_interval(self) -> None:
+        """Choose the next poll interval.
+
+        Failures stretch the interval up to ten minutes. After a command the
+        cloud is polled at the minimum interval for a few minutes because the
+        unit uploads a status packet about every 30 s.
+        """
+        base = self.base_interval
+        if self.consecutive_failures:
+            self.update_interval = max(
+                base,
+                min(base * 2**self.consecutive_failures, MAX_BACKOFF_INTERVAL),
+            )
+        elif time.monotonic() < self._fast_until:
+            self.update_interval = min(base, timedelta(seconds=MIN_SCAN_INTERVAL))
+        else:
+            self.update_interval = base
+
+    @property
+    def cycle_budget(self) -> float:
+        """Return the time one status fetch may take, always below the interval."""
+        interval = (self.update_interval or self.base_interval).total_seconds()
+        return max(10.0, interval - 5.0)
+
+    async def _async_poll(self) -> AmbientikaData:
         """Refresh metadata when due and poll every supported device."""
         started = time.monotonic()
+        generations = dict(self._generation)
         self._cycle_causes = []
         self._cycle_offline = set()
+        self._cycle_metadata = {}
         try:
             if self._discovery_due:
                 try:
@@ -150,7 +340,18 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
                         raise UpdateFailed(f"{err} ({describe_error(err)})") from err
                     self._discovery_failed(err)
             old_data = self.data or AmbientikaData()
-            statuses, failed_devices = await self._async_fetch_statuses(old_data)
+            try:
+                async with asyncio.timeout(self.cycle_budget):
+                    statuses, failed_devices = await self._async_fetch_statuses(
+                        old_data
+                    )
+                    await self._async_refresh_schedules(statuses)
+            except TimeoutError as err:
+                self._cycle_causes.append("cycle: timeout")
+                self.last_failure_causes = tuple(self._cycle_causes)
+                raise UpdateFailed(
+                    "The Ambientika update exceeded its time budget"
+                ) from err
         except AmbientikaAuthError as err:
             raise ConfigEntryAuthFailed from err
         except AmbientikaApiError as err:
@@ -158,11 +359,14 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             raise UpdateFailed(f"{err} ({describe_error(err)})") from err
         finally:
             self.last_update_duration_ms = round((time.monotonic() - started) * 1000)
+            self.cycle_durations_ms.append(self.last_update_duration_ms)
 
         self.last_failure_causes = tuple(self._cycle_causes)
         back_online = self._track_offline(failed_devices)
         if failed_devices and not set(statuses).difference(failed_devices):
             causes = "; ".join(self._cycle_causes) or "no usable status packets"
+            # A unit without power is not a cloud outage: keep the normal pace.
+            self._cycle_outage = not failed_devices <= self._cycle_offline
             raise UpdateFailed(f"No Ambientika device status could be read ({causes})")
 
         # Offline devices are logged separately on their own transitions.
@@ -179,12 +383,24 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             LOGGER.info("Recovered updates for %d Ambientika device(s)", len(recovered))
         self._failed_devices = failed_devices
 
+        self._apply_metadata(self._cycle_metadata)
+
+        # Results fetched before or right after a command may still carry the
+        # old state; the commanded state stays until a later poll confirms it.
+        current = self.data or AmbientikaData()
         merged: dict[str, AmbientikaDeviceData] = {}
         for serial, device in self._known_devices.items():
-            old_status = old_data.devices.get(serial)
+            current_device = current.devices.get(serial)
+            superseded = self._poll_superseded(serial, generations, started)
+            if superseded:
+                self.discarded_polls += 1
             status = (
-                statuses.get(serial)
-                or (old_status.status if old_status is not None else None)
+                (
+                    current_device.status
+                    if superseded and current_device is not None
+                    else statuses.get(serial)
+                )
+                or (current_device.status if current_device is not None else None)
                 if device.role != "NotConfigured"
                 else None
             )
@@ -192,8 +408,7 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             merged[serial] = AmbientikaDeviceData(
                 device=device,
                 status=status,
-                schedule=self._schedules.get(serial)
-                or (old_status.schedule if old_status is not None else None),
+                schedule=self._schedules.get(serial),
             )
 
         self.last_partial_failures = len(failed_devices)
@@ -202,7 +417,17 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             devices=merged,
             feature_flags=dict(self._feature_flags),
             failed_devices=frozenset(failed_devices),
+            offline_devices=frozenset(self.offline_devices),
         )
+
+    def _poll_superseded(
+        self, serial: str, generations: dict[str, int], started: float
+    ) -> bool:
+        """Return whether a command made this poll's result for a device stale."""
+        if self._generation.get(serial, 0) != generations.get(serial, 0):
+            return True
+        command_time = self._command_time.get(serial)
+        return command_time is not None and started - command_time < STATUS_SETTLE_TIME
 
     def _track_offline(self, failed_devices: set[str]) -> set[str]:
         """Log offline transitions once and return devices back online."""
@@ -290,18 +515,35 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             return None
         return WRITE_FALLBACKS.get(field)
 
+    # ------------------------------------------------------------------
+    # Discovery, metadata and schedules
+    # ------------------------------------------------------------------
+
     async def _async_discover(self) -> None:
         """Discover all current devices and optional server capabilities."""
         houses = await self.api.async_houses_info()
         house_metadata: object = None
         try:
             house_metadata = await self.api.async_houses()
-        except (AmbientikaForbiddenError, AmbientikaNotFoundError, AmbientikaApiError):
+        except AmbientikaAuthError:
+            raise
+        except AmbientikaApiError:
             LOGGER.debug("Optional Ambientika house metadata is unavailable")
-        self._known_devices = parse_houses(houses, house_metadata)
+        devices = parse_houses(houses, house_metadata)
+        if not devices and self._known_devices:
+            # An empty answer for an account that had devices is a cloud
+            # problem, not a reason to remove every device.
+            raise AmbientikaResponseError("Discovery returned no devices")
+        changes = self._diff_devices(self._known_devices, devices)
+        self._known_devices = devices
+        for serial, device in devices.items():
+            self.firmware_history.setdefault(serial, [self._firmware_entry(device)])
+        self._publish_device_changes(changes)
         # Retry unsupported endpoints after discovery (normally every six hours),
         # including devices whose firmware or role changed since the last probe.
         self._unsupported_status.clear()
+        self._status_errors.clear()
+        self._status_retry_at.clear()
         self._last_discovery = datetime.now(UTC)
         self._rediscovery_requested = False
         if self.discovery_failures:
@@ -311,38 +553,171 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         feature_flags: dict[str, bool] = {}
         try:
             feature_flags = await self.api.async_feature_flags()
-        except (AmbientikaForbiddenError, AmbientikaNotFoundError, AmbientikaApiError):
+        except AmbientikaAuthError:
+            raise
+        except AmbientikaApiError:
             LOGGER.debug("Optional Ambientika feature flags are unavailable")
         if feature_flags:
             self._feature_flags = feature_flags
-        await self._async_fetch_schedules()
+        # Schedules are fetched with the next status update, once it is known
+        # which devices report a schedule at all.
+        self._schedule_due = {
+            serial
+            for serial, device in devices.items()
+            if device.device_id is not None and is_controllable_device(device)
+        }
 
-    async def _async_fetch_schedules(self) -> None:
-        """Refresh optional weekly schedules without blocking discovery."""
+    async def _async_refresh_schedules(
+        self, statuses: dict[str, AmbientikaStatus]
+    ) -> None:
+        """Fetch weekly schedules only for devices that report one.
+
+        A schedule is requested after discovery and whenever a device starts
+        reporting a schedule state; devices that report ``NotAvailable`` have
+        none and are not asked.
+        """
         if self._feature_flags.get("weeklyScheduler") is False:
             self._schedules = {}
+            self._schedule_due.clear()
             return
 
-        candidates = [
-            (serial, device.device_id)
-            for serial, device in self._known_devices.items()
-            if device.device_id is not None and is_controllable_device(device)
-        ]
+        candidates: list[tuple[str, int]] = []
+        for serial, device in self._known_devices.items():
+            status = statuses.get(serial)
+            state = status.schedule_state if status is not None else None
+            previous = self._schedule_states.get(serial)
+            if state is None:
+                continue
+            self._schedule_states[serial] = state
+            if state == "NotAvailable":
+                self._schedules.pop(serial, None)
+                self._schedule_due.discard(serial)
+            elif (
+                device.device_id is not None
+                and is_controllable_device(device)
+                and (
+                    serial in self._schedule_due
+                    or (
+                        previous in (None, "NotAvailable")
+                        and serial not in self._schedules
+                    )
+                )
+            ):
+                candidates.append((serial, device.device_id))
+        if not candidates:
+            return
+
         results = await asyncio.gather(
             *(self.api.async_schedule(device_id) for _, device_id in candidates),
             return_exceptions=True,
         )
-        schedules: dict[str, AmbientikaSchedule] = {}
         for (serial, _device_id), result in zip(candidates, results, strict=True):
+            self._schedule_due.discard(serial)
             if isinstance(result, dict):
-                schedules[serial] = parse_schedule(result)
+                self._schedules[serial] = parse_schedule(result)
             elif isinstance(result, AmbientikaAuthError):
                 raise result
-            elif not isinstance(result, AmbientikaNotFoundError):
-                previous = self._schedules.get(serial)
-                if previous is not None:
-                    schedules[serial] = previous
-        self._schedules = schedules
+            elif isinstance(result, AmbientikaNotFoundError):
+                self._schedules.pop(serial, None)
+
+    @staticmethod
+    def _firmware_entry(device: AmbientikaDevice) -> dict[str, Any]:
+        """Return one firmware history entry (no personal data)."""
+        return {
+            "at": datetime.now(UTC).isoformat(),
+            "micro": device.micro_firmware,
+            "radio": device.radio_firmware,
+            "radio_at": device.radio_at_firmware,
+        }
+
+    @staticmethod
+    def _diff_devices(
+        old: dict[str, AmbientikaDevice], new: dict[str, AmbientikaDevice]
+    ) -> dict[str, dict[str, tuple[Any, Any]]]:
+        """Return changed name, role, firmware and zone index of known devices."""
+        changes: dict[str, dict[str, tuple[Any, Any]]] = {}
+        for serial, device in new.items():
+            previous = old.get(serial)
+            if previous is None:
+                continue
+            changed = {
+                field: (getattr(previous, field), getattr(device, field))
+                for field in DEVICE_METADATA_FIELDS
+                if getattr(previous, field) != getattr(device, field)
+            }
+            if changed:
+                changes[serial] = changed
+        return changes
+
+    def _apply_metadata(self, metadata: dict[str, AmbientikaDeviceMetadata]) -> None:
+        """Merge metadata from the house status tree into the known devices.
+
+        Every poll carries names, roles and firmware versions, so changes show up
+        within one poll instead of at the next discovery. Devices that appear in
+        the tree but are unknown trigger an early discovery.
+        """
+        updated = dict(self._known_devices)
+        for serial, meta in metadata.items():
+            device = updated.get(serial)
+            if device is None:
+                if serial not in self._unknown_batch_serials:
+                    self._unknown_batch_serials.add(serial)
+                    self._rediscovery_requested = True
+                continue
+            values = {
+                field: getattr(meta, field)
+                for field in DEVICE_METADATA_FIELDS
+                if getattr(meta, field) is not None
+                and getattr(meta, field) != getattr(device, field)
+            }
+            if values:
+                updated[serial] = replace(device, **values)
+        changes = self._diff_devices(self._known_devices, updated)
+        if not changes:
+            return
+        self._known_devices = updated
+        if any("role" in fields for fields in changes.values()):
+            self._rediscovery_requested = True
+        self._publish_device_changes(changes)
+
+    def _publish_device_changes(
+        self, changes: dict[str, dict[str, tuple[Any, Any]]]
+    ) -> None:
+        """Update the device registry, record history and fire change events."""
+        if not changes:
+            return
+        registry = dr.async_get(self.hass)
+        for serial, fields in changes.items():
+            device = self._known_devices[serial]
+            self.device_changes += 1
+            if any(field.endswith("firmware") for field in fields):
+                history = self.firmware_history.setdefault(serial, [])
+                history.append(self._firmware_entry(device))
+                del history[:-MAX_FIRMWARE_HISTORY]
+            entry = registry.async_get_device(identifiers={(DOMAIN, serial)})
+            if entry is not None:
+                registry.async_update_device(
+                    entry.id, name=device.name, sw_version=firmware_text(device)
+                )
+            LOGGER.info(
+                "Ambientika device %s changed: %s",
+                mask_serial(serial),
+                ", ".join(sorted(fields)),
+            )
+            self.hass.bus.async_fire(
+                EVENT_DEVICE_CHANGED,
+                {
+                    "device_id": entry.id if entry is not None else None,
+                    "changes": {
+                        field: {"old": old, "new": new}
+                        for field, (old, new) in fields.items()
+                    },
+                },
+            )
+
+    # ------------------------------------------------------------------
+    # Status fetching
+    # ------------------------------------------------------------------
 
     async def _async_fetch_statuses(
         self, old_data: AmbientikaData
@@ -376,6 +751,7 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         transient_houses: set[int] = set()
         for house_id, batch_result in zip(house_ids, batch_results, strict=True):
             if isinstance(batch_result, dict):
+                self._cycle_metadata.update(parse_house_status_metadata(batch_result))
                 statuses.update(
                     (serial, status)
                     for serial, status in parse_house_statuses(batch_result).items()
@@ -390,8 +766,20 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
                 if isinstance(batch_result, TRANSIENT_ERRORS):
                     transient_houses.add(house_id)
 
+        for serial in statuses:
+            self._status_errors.pop(serial, None)
+            self._status_retry_at.pop(serial, None)
         self._unsupported_status.difference_update(statuses)
-        pending = sorted(readable_serials - self._unsupported_status - statuses.keys())
+        now = time.monotonic()
+        pending: list[str] = []
+        backed_off: list[str] = []
+        for serial in sorted(
+            readable_serials - self._unsupported_status - statuses.keys()
+        ):
+            if self._status_retry_at.get(serial, 0.0) > now:
+                backed_off.append(serial)
+            else:
+                pending.append(serial)
         direct: list[str] = []
         deferred: dict[int, list[str]] = {}
         for serial in pending:
@@ -412,10 +800,18 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
                 skipped.update(serials[1:])
 
         failed_devices = self._unsupported_status & readable_serials
+
+        def keep_last_status(serial: str) -> None:
+            old_device_data = old_data.devices.get(serial)
+            if old_device_data is not None and old_device_data.status is not None:
+                statuses[serial] = old_device_data.status
+
         for serial in pending:
             device_result = results.get(serial)
             if isinstance(device_result, AmbientikaStatus):
                 statuses[serial] = device_result
+                self._status_errors.pop(serial, None)
+                self._status_retry_at.pop(serial, None)
                 continue
             if isinstance(device_result, AmbientikaAuthError):
                 raise device_result
@@ -427,13 +823,14 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             if isinstance(
                 device_result, AmbientikaNotFoundError | AmbientikaForbiddenError
             ):
-                self._unsupported_status.add(serial)
+                self._note_status_rejected(serial)
                 if isinstance(device_result, AmbientikaDeviceNotFoundError):
                     self._rediscovery_requested = True
             failed_devices.add(serial)
-            old_device_data = old_data.devices.get(serial)
-            if old_device_data is not None and old_device_data.status is not None:
-                statuses[serial] = old_device_data.status
+            keep_last_status(serial)
+        for serial in backed_off:
+            failed_devices.add(serial)
+            keep_last_status(serial)
         if skipped:
             LOGGER.debug(
                 "Skipped %d individual Ambientika status request(s) during a "
@@ -441,6 +838,21 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
                 len(skipped),
             )
         return statuses, failed_devices
+
+    def _note_status_rejected(self, serial: str) -> None:
+        """Back off a device whose status request was rejected with 403/404.
+
+        Only repeated rejections mark the endpoint as unsupported until the next
+        discovery; a unit that was briefly unreachable recovers on its own.
+        """
+        streak = self._status_errors.get(serial, 0) + 1
+        self._status_errors[serial] = streak
+        if streak >= UNSUPPORTED_AFTER_FAILURES:
+            self._unsupported_status.add(serial)
+            self._status_retry_at.pop(serial, None)
+            return
+        delay = DEVICE_RETRY_DELAYS[min(streak, len(DEVICE_RETRY_DELAYS)) - 1]
+        self._status_retry_at[serial] = time.monotonic() + delay
 
     async def _async_fetch_many(
         self, serials: list[str]
@@ -460,6 +872,23 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             raise AmbientikaResponseError("Device status is missing or mismatched")
         return status
 
+    # ------------------------------------------------------------------
+    # Commands
+    # ------------------------------------------------------------------
+
+    def _write_lock(self, serial: str) -> asyncio.Lock:
+        """Return the lock that serializes the requests of one device."""
+        return self._write_locks.setdefault(serial, asyncio.Lock())
+
+    def _mark_command(self, serial: str) -> int:
+        """Record a command: invalidate older polls and poll faster for a while."""
+        generation = self._generation.get(serial, 0) + 1
+        self._generation[serial] = generation
+        self._command_time[serial] = time.monotonic()
+        self._fast_until = time.monotonic() + FAST_POLL_DURATION.total_seconds()
+        self._apply_interval()
+        return generation
+
     async def async_write_state(
         self,
         serial: str,
@@ -470,7 +899,67 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         light_sensor_level: str | None = None,
         schedule_mode: bool | None = None,
     ) -> None:
-        """Write a complete validated state and read the actual result back."""
+        """Write a validated state, merging commands that arrive together.
+
+        Commands for the same device within a short window are combined into
+        one request, based on the last known state plus unconfirmed commands.
+        The call returns once the cloud confirmed the result or after the
+        read-back attempts.
+        """
+        requested = {
+            field: value
+            for field, value in (
+                ("operating_mode", operating_mode),
+                ("fan_speed", fan_speed),
+                ("humidity_level", humidity_level),
+                ("light_sensor_level", light_sensor_level),
+                ("schedule_mode", schedule_mode),
+            )
+            if value is not None
+        }
+        pending = self._pending_writes.get(serial)
+        if pending is not None:
+            merged = {**pending.fields, **requested}
+            try:
+                self._plan_write(serial, merged)
+            except ServiceValidationError:
+                # Not valid together (for example a speed and then "off"):
+                # the collected commands go out first, this one follows.
+                del self._pending_writes[serial]
+                pending = None
+            else:
+                pending.fields = merged
+        if pending is None:
+            self._plan_write(serial, requested)
+            pending = _PendingWrite(
+                fields=requested, future=self.hass.loop.create_future()
+            )
+            self._pending_writes[serial] = pending
+            pending.future.add_done_callback(_consume_exception)
+            self.config_entry.async_create_background_task(
+                self.hass,
+                self._async_flush_write(serial, pending),
+                f"{DOMAIN}_write_{mask_serial(serial)}",
+            )
+        await asyncio.shield(pending.future)
+
+    async def _async_flush_write(self, serial: str, pending: _PendingWrite) -> None:
+        """Send the collected commands and report the outcome to every caller."""
+        try:
+            await asyncio.sleep(WRITE_BATCH_DELAY)
+            if self._pending_writes.get(serial) is pending:
+                del self._pending_writes[serial]
+            await self._async_execute_write(serial, pending.fields)
+        except asyncio.CancelledError:
+            pending.future.cancel()
+            raise
+        except Exception as err:
+            pending.future.set_exception(err)
+        else:
+            pending.future.set_result(None)
+
+    def _plan_write(self, serial: str, fields: dict[str, Any]) -> _WritePlan:
+        """Validate commands against the current state and build the full state."""
         device_data = self.data.devices.get(serial) if self.data else None
         status = device_data.status if device_data else None
         if device_data is None or status is None:
@@ -479,6 +968,11 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         if not is_controllable_device(device_data.device, status):
             raise validation_error("device_not_controllable")
 
+        operating_mode: str | None = fields.get("operating_mode")
+        fan_speed: str | None = fields.get("fan_speed")
+        humidity_level: str | None = fields.get("humidity_level")
+        light_sensor_level: str | None = fields.get("light_sensor_level")
+        schedule_mode: bool | None = fields.get("schedule_mode")
         requested_settings = {
             "operating_mode": operating_mode,
             "fan_speed": fan_speed,
@@ -542,37 +1036,6 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         ):
             raise validation_error("incomplete_writable_state")
 
-        try:
-            await self.api.async_change_mode(
-                serial,
-                **values,  # type: ignore[arg-type]
-                schedule_mode=(
-                    schedule_mode
-                    if schedule_mode is not None
-                    else status.schedule_state == "On"
-                ),
-            )
-        except AmbientikaAuthError as err:
-            self.config_entry.async_start_reauth(self.hass)
-            raise action_error("auth_failed") from err
-        except AmbientikaDeviceOfflineError as err:
-            LOGGER.debug(
-                "Ambientika device %s did not respond: %s",
-                mask_serial(serial),
-                describe_error(err),
-            )
-            raise action_error("device_offline") from err
-        except (AmbientikaApiError, ValueError) as err:
-            LOGGER.debug(
-                "Ambientika command for %s failed: %s",
-                mask_serial(serial),
-                describe_error(err),
-            )
-            raise action_error("cloud_command_failed") from err
-
-        # Accepted is not delivered: the cloud also accepts commands for units
-        # that are offline. Read back after a delay and otherwise show the
-        # written values until the next poll corrects them.
         expected: dict[str, str] = {
             field: value
             for field, value in requested_settings.items()
@@ -581,31 +1044,73 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         expected["operating_mode"] = str(target_mode)
         if schedule_mode is not None:
             expected["schedule_state"] = "On" if schedule_mode else "Off"
+        return _WritePlan(
+            values={key: str(value) for key, value in values.items()},
+            expected=expected,
+            schedule_mode=(
+                schedule_mode
+                if schedule_mode is not None
+                else status.schedule_state == "On"
+            ),
+            status=status,
+        )
+
+    async def _async_execute_write(self, serial: str, fields: dict[str, Any]) -> None:
+        """Send one validated command and confirm it with a delayed read-back."""
+        async with self._write_lock(serial):
+            plan = self._plan_write(serial, fields)
+            try:
+                await self.api.async_change_mode(
+                    serial,
+                    **plan.values,
+                    schedule_mode=plan.schedule_mode,
+                )
+            except AmbientikaAuthError as err:
+                self.config_entry.async_start_reauth(self.hass)
+                raise action_error("auth_failed") from err
+            except AmbientikaDeviceOfflineError as err:
+                LOGGER.debug(
+                    "Ambientika device %s did not respond: %s",
+                    mask_serial(serial),
+                    describe_error(err),
+                )
+                raise action_error("device_offline") from err
+            except (AmbientikaApiError, ValueError) as err:
+                LOGGER.debug(
+                    "Ambientika command for %s failed: %s",
+                    mask_serial(serial),
+                    describe_error(err),
+                )
+                raise action_error("cloud_command_failed") from err
+
+            # Accepted is not delivered: the cloud also accepts commands for
+            # units that are offline. Show the written values at once; the
+            # state read back below, or the next poll, corrects them.
+            generation = self._mark_command(serial)
+            self._apply_status(serial, _with_expected(plan.status, plan.expected))
 
         def matches(candidate: AmbientikaStatus) -> bool:
             return all(
-                getattr(candidate, field) == value for field, value in expected.items()
+                getattr(candidate, field) == value
+                for field, value in plan.expected.items()
             )
 
         latest, matched = await self._async_read_back(serial, matches)
-        refreshed = latest if matched and latest is not None else None
-        if refreshed is None:
+        if self._generation.get(serial, 0) != generation:
+            LOGGER.debug(
+                "Ambientika read-back for %s dropped: a newer command was sent",
+                mask_serial(serial),
+            )
+            return
+        if matched and latest is not None:
+            refreshed = latest
+        else:
             LOGGER.debug(
                 "Ambientika command for %s is not reflected yet; showing the "
                 "written values until the next poll",
                 mask_serial(serial),
             )
-            base = latest or status
-            refreshed = replace(
-                base,
-                operating_mode=expected["operating_mode"],
-                fan_speed=expected.get("fan_speed", base.fan_speed),
-                humidity_level=expected.get("humidity_level", base.humidity_level),
-                light_sensor_level=expected.get(
-                    "light_sensor_level", base.light_sensor_level
-                ),
-                schedule_state=expected.get("schedule_state", base.schedule_state),
-            )
+            refreshed = _with_expected(latest or plan.status, plan.expected)
         self._remember_writable(serial, refreshed)
         self._apply_status(serial, refreshed)
 
@@ -639,9 +1144,9 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         devices = dict(self.data.devices)
         devices[serial] = replace(devices[serial], status=status)
         self.async_set_updated_data(
-            AmbientikaData(
+            replace(
+                self.data,
                 devices=devices,
-                feature_flags=self.data.feature_flags,
                 failed_devices=self.data.failed_devices - {serial},
             )
         )
@@ -653,27 +1158,51 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             device_data.device, device_data.status
         ):
             raise validation_error("device_not_controllable")
-        try:
-            await self.api.async_reset_filter(serial)
-        except AmbientikaAuthError as err:
-            self.config_entry.async_start_reauth(self.hass)
-            raise action_error("auth_failed") from err
-        except AmbientikaDeviceOfflineError as err:
-            raise action_error("device_offline") from err
-        except AmbientikaApiError as err:
-            LOGGER.debug(
-                "Ambientika filter reset for %s failed: %s",
-                mask_serial(serial),
-                describe_error(err),
-            )
-            raise action_error("filter_reset_failed") from err
+        async with self._write_lock(serial):
+            try:
+                await self.api.async_reset_filter(serial)
+            except AmbientikaAuthError as err:
+                self.config_entry.async_start_reauth(self.hass)
+                raise action_error("auth_failed") from err
+            except AmbientikaDeviceOfflineError as err:
+                raise action_error("device_offline") from err
+            except AmbientikaApiError as err:
+                LOGGER.debug(
+                    "Ambientika filter reset for %s failed: %s",
+                    mask_serial(serial),
+                    describe_error(err),
+                )
+                raise action_error("filter_reset_failed") from err
+            generation = self._mark_command(serial)
 
         latest, matched = await self._async_read_back(
             serial, lambda candidate: candidate.filter_status not in (None, "Bad")
         )
+        if self._generation.get(serial, 0) != generation:
+            return
         base = latest or device_data.status
         if matched and latest is not None:
             self._apply_status(serial, latest)
         elif base is not None:
             # The official app also shows the filter as good right after a reset.
             self._apply_status(serial, replace(base, filter_status="Good"))
+
+
+def _with_expected(
+    base: AmbientikaStatus, expected: dict[str, str]
+) -> AmbientikaStatus:
+    """Return a status with the written values applied."""
+    return replace(
+        base,
+        operating_mode=expected["operating_mode"],
+        fan_speed=expected.get("fan_speed", base.fan_speed),
+        humidity_level=expected.get("humidity_level", base.humidity_level),
+        light_sensor_level=expected.get("light_sensor_level", base.light_sensor_level),
+        schedule_state=expected.get("schedule_state", base.schedule_state),
+    )
+
+
+def _consume_exception(future: asyncio.Future[None]) -> None:
+    """Mark a command outcome as retrieved when every caller went away."""
+    if not future.cancelled():
+        future.exception()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 
@@ -17,9 +18,20 @@ def auto_enable_custom_integrations(enable_custom_integrations: Any) -> None:
 @pytest.fixture(autouse=True)
 def instant_read_back(monkeypatch: pytest.MonkeyPatch) -> None:
     """Skip the real delay before reading a device back after a command."""
-    monkeypatch.setattr(
-        "custom_components.ambientika_ventilation.coordinator.READBACK_DELAY", 0
-    )
+    for name in ("READBACK_DELAY", "WRITE_BATCH_DELAY", "STATUS_SETTLE_TIME"):
+        monkeypatch.setattr(
+            f"custom_components.ambientika_ventilation.coordinator.{name}", 0
+        )
+
+
+@pytest.fixture(autouse=True)
+def fan_platform() -> Any:
+    """Provide the entity platform that Home Assistant sets while loading fans."""
+    with patch(
+        "custom_components.ambientika_ventilation.fan.entity_platform"
+        ".async_get_current_platform"
+    ) as get_platform:
+        yield get_platform.return_value
 
 
 @pytest.fixture

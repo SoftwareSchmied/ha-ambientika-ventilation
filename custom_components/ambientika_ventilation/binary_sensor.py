@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -12,10 +11,12 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import AmbientikaRuntimeData
+from .coordinator import AmbientikaCoordinator
 from .entity import AmbientikaEntity
 from .models import AmbientikaStatus
 
@@ -69,6 +70,7 @@ async def async_setup_entry(
     """Set up binary sensors and track newly discovered devices."""
     coordinator = entry.runtime_data.coordinator
     known: set[str] = set()
+    known_connection: set[str] = set()
 
     @callback
     def add_new_entities() -> None:
@@ -77,17 +79,27 @@ async def async_setup_entry(
             for serial, device_data in coordinator.data.devices.items()
             if device_data.status is not None
         } - known
-        entities = [
+        entities: list[BinarySensorEntity] = [
             AmbientikaBinarySensor(coordinator, serial, description)
             for serial in serials
             for description in BINARY_SENSORS
         ]
+        connection_serials = {
+            serial
+            for serial, device_data in coordinator.data.devices.items()
+            if device_data.device.role != "NotConfigured"
+        } - known_connection
+        entities.extend(
+            AmbientikaCloudConnection(coordinator, serial)
+            for serial in connection_serials
+        )
         if entities:
             async_add_entities(entities)
             known.update(serials)
+            known_connection.update(connection_serials)
 
     add_new_entities()
-    entry.async_on_unload(coordinator.async_add_listener(add_new_entities))
+    entry.async_on_unload(coordinator.async_add_topology_listener(add_new_entities))
 
 
 class AmbientikaBinarySensor(AmbientikaEntity, BinarySensorEntity):
@@ -97,7 +109,7 @@ class AmbientikaBinarySensor(AmbientikaEntity, BinarySensorEntity):
 
     def __init__(
         self,
-        coordinator: Any,
+        coordinator: AmbientikaCoordinator,
         serial: str,
         description: AmbientikaBinarySensorDescription,
     ) -> None:
@@ -111,3 +123,36 @@ class AmbientikaBinarySensor(AmbientikaEntity, BinarySensorEntity):
         if self.status is None:
             return None
         return self.entity_description.is_on_fn(self.status)
+
+
+class AmbientikaCloudConnection(AmbientikaEntity, BinarySensorEntity):
+    """Show whether the cloud currently has status data from the unit.
+
+    Unlike the other entities this one stays available while the unit is
+    offline, so that an outage is visible as "disconnected" instead of
+    "unavailable".
+    """
+
+    _attr_translation_key = "cloud_connection"
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: AmbientikaCoordinator, serial: str) -> None:
+        """Initialize the connection sensor."""
+        super().__init__(coordinator, serial, "cloud_connection")
+
+    @property
+    def available(self) -> bool:
+        """Report a state as long as the device is part of the account."""
+        return self._serial in self.coordinator.data.devices
+
+    @property
+    def is_on(self) -> bool:
+        """Return whether the cloud delivers current status for the unit."""
+        data = self.coordinator.data
+        return (
+            self.coordinator.last_update_success
+            and self._serial not in data.offline_devices
+            and self._serial not in data.failed_devices
+            and self.status is not None
+        )

@@ -11,7 +11,11 @@ from custom_components.ambientika_ventilation import (
     async_unload_entry,
 )
 from custom_components.ambientika_ventilation.api import AmbientikaToken
-from custom_components.ambientika_ventilation.const import DOMAIN, PLATFORMS
+from custom_components.ambientika_ventilation.const import (
+    DOMAIN,
+    PLATFORMS,
+    TOKEN_RENEW_BEFORE,
+)
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -31,11 +35,18 @@ async def test_setup_entry_builds_runtime_and_persists_refreshed_token(hass) -> 
     )
     entry.add_to_hass(hass)
     api = MagicMock()
+    api.async_renew_token_if_due = AsyncMock(return_value=False)
     coordinator = MagicMock()
     coordinator.async_config_entry_first_refresh = AsyncMock()
     forward = AsyncMock()
+    session = MagicMock()
+    session.close = AsyncMock()
 
     with (
+        patch(
+            "custom_components.ambientika_ventilation.create_session",
+            return_value=session,
+        ),
         patch(
             "custom_components.ambientika_ventilation.AmbientikaApiClient",
             return_value=api,
@@ -59,8 +70,14 @@ async def test_setup_entry_builds_runtime_and_persists_refreshed_token(hass) -> 
     assert entry.runtime_data.api is api
     assert entry.runtime_data.coordinator is coordinator
     assert entry.data["token"] == "renewed"
+    assert client_class.call_args.args[0] is session
     coordinator.async_config_entry_first_refresh.assert_awaited_once()
     forward.assert_awaited_once_with(entry, PLATFORMS)
+    api.async_renew_token_if_due.assert_awaited_once_with(TOKEN_RENEW_BEFORE)
+
+    # Unloading closes the dedicated session and stops the daily token check.
+    await entry._async_process_on_unload(hass)
+    session.close.assert_awaited_once()
 
 
 async def test_unload_entry_delegates_to_platform_manager(hass) -> None:

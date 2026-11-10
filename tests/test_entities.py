@@ -87,7 +87,7 @@ def coordinator_with_status():
             )
         }
     )
-    coordinator.async_add_listener = MagicMock(return_value=MagicMock())
+    coordinator.async_add_topology_listener = MagicMock(return_value=MagicMock())
     coordinator.async_write_state = AsyncMock()
     coordinator.async_reset_filter = AsyncMock()
     return coordinator
@@ -450,7 +450,7 @@ async def test_all_platform_setup_callbacks(hass) -> None:
         await setup(hass, entry, added.extend)
         counts.append(len(added))
 
-    assert counts == [4, 1, 1, 3, 9, 1]
+    assert counts == [5, 1, 1, 3, 9, 1]
     assert entry.async_on_unload.call_count == len(setup_functions)
 
 

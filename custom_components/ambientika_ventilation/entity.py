@@ -6,7 +6,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import AmbientikaCoordinator
+from .coordinator import AmbientikaCoordinator, firmware_text
 from .models import AmbientikaDeviceData, AmbientikaStatus
 
 
@@ -57,11 +57,6 @@ class AmbientikaEntity(CoordinatorEntity[AmbientikaCoordinator]):
         model = device.device_type or "Ambientika ventilation unit"
         if device.device_subtype and device.device_subtype != "None":
             model = f"{model} {device.device_subtype}"
-        firmware_parts = [
-            device.micro_firmware,
-            device.radio_firmware,
-            device.radio_at_firmware,
-        ]
         return DeviceInfo(
             identifiers={(DOMAIN, self._serial)},
             manufacturer="Südwind",
@@ -74,5 +69,5 @@ class AmbientikaEntity(CoordinatorEntity[AmbientikaCoordinator]):
             ),
             serial_number=self._serial,
             suggested_area=device.room_name,
-            sw_version=" / ".join(part for part in firmware_parts if part) or None,
+            sw_version=firmware_text(device),
         )

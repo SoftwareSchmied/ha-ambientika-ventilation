@@ -18,7 +18,13 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import AmbientikaRuntimeData
-from .const import AIR_QUALITY_LEVELS, API_TO_HA, FILTER_STATUSES, OPERATING_MODES
+from .const import (
+    AIR_QUALITY_LEVELS,
+    API_TO_HA,
+    FILTER_STATUSES,
+    REPORTED_OPERATING_MODES,
+)
+from .coordinator import AmbientikaCoordinator
 from .entity import AmbientikaEntity
 from .models import AmbientikaDevice, AmbientikaStatus
 
@@ -89,7 +95,7 @@ SENSORS = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda status: status.last_operating_mode,
-        enum_values=OPERATING_MODES,
+        enum_values=REPORTED_OPERATING_MODES,
     ),
     AmbientikaSensorDescription(
         key="signal_strength",
@@ -240,6 +246,11 @@ DEVICE_SENSORS = (
 )
 
 
+def _enum_state(value: object, known: tuple[str, ...]) -> str | None:
+    """Return the translated state of a known enum value, else unknown."""
+    return API_TO_HA.get(value) if isinstance(value, str) and value in known else None
+
+
 def _without_none(values: dict[str, Any]) -> dict[str, Any]:
     """Remove absent optional metadata from entity attributes."""
     return {key: value for key, value in values.items() if value is not None}
@@ -287,7 +298,7 @@ async def async_setup_entry(
             known_devices.update(serials)
 
     add_new_entities()
-    entry.async_on_unload(coordinator.async_add_listener(add_new_entities))
+    entry.async_on_unload(coordinator.async_add_topology_listener(add_new_entities))
 
 
 class AmbientikaSensor(AmbientikaEntity, SensorEntity):
@@ -297,7 +308,7 @@ class AmbientikaSensor(AmbientikaEntity, SensorEntity):
 
     def __init__(
         self,
-        coordinator: Any,
+        coordinator: AmbientikaCoordinator,
         serial: str,
         description: AmbientikaSensorDescription,
     ) -> None:
@@ -314,8 +325,19 @@ class AmbientikaSensor(AmbientikaEntity, SensorEntity):
             return None
         value = self.entity_description.value_fn(self.status)
         if self.entity_description.enum_values:
-            return API_TO_HA.get(value)
+            return _enum_state(value, self.entity_description.enum_values)
         return value
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Keep the raw value when the cloud sends something not yet known."""
+        description = self.entity_description
+        if self.status is None or not description.enum_values:
+            return None
+        value = description.value_fn(self.status)
+        if value is not None and _enum_state(value, description.enum_values) is None:
+            return {"raw_value": str(value)}
+        return None
 
 
 class AmbientikaDeviceSensor(AmbientikaEntity, SensorEntity):
@@ -325,7 +347,7 @@ class AmbientikaDeviceSensor(AmbientikaEntity, SensorEntity):
 
     def __init__(
         self,
-        coordinator: Any,
+        coordinator: AmbientikaCoordinator,
         serial: str,
         description: AmbientikaDeviceSensorDescription,
     ) -> None:
@@ -349,7 +371,7 @@ class AmbientikaDeviceSensor(AmbientikaEntity, SensorEntity):
         """Return the parsed device metadata value."""
         value = self.entity_description.value_fn(self.device_data.device)
         if self.entity_description.enum_values:
-            return API_TO_HA.get(value)
+            return _enum_state(value, self.entity_description.enum_values)
         return value
 
     @property
@@ -366,7 +388,7 @@ class AmbientikaScheduleSensor(AmbientikaEntity, SensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_entity_registry_enabled_default = False
 
-    def __init__(self, coordinator: Any, serial: str) -> None:
+    def __init__(self, coordinator: AmbientikaCoordinator, serial: str) -> None:
         """Initialize the schedule summary sensor."""
         super().__init__(coordinator, serial, "schedule_entries")
 

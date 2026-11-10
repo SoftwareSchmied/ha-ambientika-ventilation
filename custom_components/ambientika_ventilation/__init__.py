@@ -2,25 +2,56 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+from datetime import datetime
 
+import aiohttp
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import HomeAssistant
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, EVENT_HOMEASSISTANT_CLOSE
+from homeassistant.core import Event, HomeAssistant
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.util.ssl import client_context
 
-from .api import AmbientikaApiClient, AmbientikaToken
+from .api import (
+    AmbientikaApiClient,
+    AmbientikaApiError,
+    AmbientikaToken,
+    describe_error,
+)
 from .const import (
     CONF_BASE_URL,
     CONF_EXPIRES_AT,
     CONF_TOKEN,
     CONF_USER_ID,
+    CONNECT_TIMEOUT,
     DEFAULT_BASE_URL,
     DOMAIN,
+    KEEPALIVE_TIMEOUT,
     PLATFORMS,
+    REQUEST_TIMEOUT,
+    TOKEN_CHECK_INTERVAL,
+    TOKEN_RENEW_BEFORE,
 )
 from .coordinator import AmbientikaCoordinator
+
+LOGGER = logging.getLogger(__name__)
+
+
+def create_session(hass: HomeAssistant) -> aiohttp.ClientSession:
+    """Create the session of one entry with long-lived keep-alive connections.
+
+    The shared Home Assistant session closes idle connections after 15 s while
+    the cloud keeps them for about two minutes, so every poll would open a new
+    TLS connection. A dedicated session reuses it.
+    """
+    return aiohttp.ClientSession(
+        connector=aiohttp.TCPConnector(
+            ssl=client_context(), keepalive_timeout=KEEPALIVE_TIMEOUT
+        ),
+        timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT, connect=CONNECT_TIMEOUT),
+    )
 
 
 @dataclass(slots=True)
@@ -50,8 +81,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: AmbientikaConfigEntry) -
             unique_id=entry.unique_id or f"{DOMAIN}_{token.user_id}",
         )
 
+    session = create_session(hass)
+    close_listener_fired = False
+
+    async def close_session(_event: Event | None = None) -> None:
+        nonlocal close_listener_fired
+        close_listener_fired = True
+        await session.close()
+
+    unsubscribe_close = hass.bus.async_listen_once(
+        EVENT_HOMEASSISTANT_CLOSE, close_session
+    )
+
+    async def release_session() -> None:
+        if not close_listener_fired:
+            unsubscribe_close()
+        await session.close()
+
+    entry.async_on_unload(release_session)
+
     api = AmbientikaApiClient(
-        async_get_clientsession(hass),
+        session,
         entry.data.get(CONF_BASE_URL, DEFAULT_BASE_URL),
         entry.data[CONF_USERNAME],
         entry.data[CONF_PASSWORD],
@@ -63,6 +113,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: AmbientikaConfigEntry) -
     coordinator = AmbientikaCoordinator(hass, entry, api)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = AmbientikaRuntimeData(api=api, coordinator=coordinator)
+
+    async def renew_token(_now: datetime | None = None) -> None:
+        try:
+            if await api.async_renew_token_if_due(TOKEN_RENEW_BEFORE):
+                LOGGER.info("Renewed the Ambientika token ahead of its expiry")
+        except AmbientikaApiError as err:
+            LOGGER.warning(
+                "Unable to renew the Ambientika token ahead of its expiry (%s); "
+                "it will be retried daily",
+                describe_error(err),
+            )
+
+    entry.async_on_unload(
+        async_track_time_interval(hass, renew_token, TOKEN_CHECK_INTERVAL)
+    )
+    await renew_token()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
