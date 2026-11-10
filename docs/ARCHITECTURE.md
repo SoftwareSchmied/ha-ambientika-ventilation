@@ -58,3 +58,78 @@ It logs neither credentials nor bodies. Diagnostics use redacted identifier
 suffixes and omit user-created names and full cloud payloads. The vendor API
 does not currently offer OAuth/PKCE; this limitation is documented rather than
 hidden behind a custom token scheme.
+
+## Hybrid data model (cloud + local)
+
+Status of the work: `datapoints.py` and `hub.py` are pure Python (no Home
+Assistant imports) and not yet wired into the coordinator or the platforms.
+
+Ambientika units are reported by the cloud REST API; a passive local UDP
+broadcast adds the physical state. For every value that exists in both
+sources there is a cloud variant, a local variant and an effective value.
+
+### Sources
+
+| Source | Provides | Notes |
+|---|---|---|
+| `cloud` | settings, measurements, alarms, filter, signal, mode | polled every 30-60 s |
+| `local_udp` | coupling, direction, physical stage, liveness | master only, heartbeat ~27 s plus a frame on every change |
+| `expected` | pending command values | lifetime 30 s, cleared when the cloud confirms |
+| `cloud_heuristic` | `running` derived from the mode | fallback only |
+| `local_tcp` | reserved | not used yet |
+
+Slaves never transmit. Their direction is derived from the zone coupling:
+opposite runs reverse to the master, same runs alike, idle is stopped. UDP has
+no temperature or humidity.
+
+### Freshness
+
+| Source | Fresh | Stale | Gone |
+|---|---|---|---|
+| UDP | last frame < 3 heartbeats (~81 s) | 3 heartbeats missed | 5 min or more |
+| Cloud | last good poll < 150 s and device not failed | older, device failed or no status | no poll for 150 s |
+| Expected | < 30 s | expired | - |
+
+One timer per hub (`evaluate()`, every 10 s) ages the sources; there are no
+per-entity timers.
+
+### Selection rules
+
+- Priority: local, then expected, then cloud.
+- Hysteresis: cloud to local only after 2 local frames; local to cloud
+  immediately when local is stale. A datapoint without cloud alternative
+  (direction, stage) uses local from the first frame.
+- Settings (operating mode, fan speed setting, humidity level, light level)
+  come from expected or cloud only. Controls follow the setting, never the
+  physical state, so an idle unit in Away mode is not shown as off.
+- The UDP stage and the cloud fan speed are different quantities and never
+  conflict. A conflict is counted once per episode when the cloud still
+  disagrees with a fresh local `power` more than 2 cloud cycles after the
+  local change.
+- Notifications are sent only when the effective value, the source, the
+  availability or a raw variant changes. Identical heartbeats notify nothing.
+  Volatile values (`last_seen`, `heartbeat_age`) notify only on availability
+  or source changes.
+
+### Per-device data source
+
+`data_source` is `local_udp` (local engaged and cloud fresh), `cloud`,
+`degraded` (only one of the two sources works although both were expected,
+for example a cloud outage while UDP still flows) or `offline`.
+
+### Planned entity schema
+
+- The effective entity keeps the existing unique ID `<serial>_<key>`, so
+  history and automations survive.
+- For datapoints with `has_variants` (`power`, `running`, `last_seen`) the
+  variants `<serial>_<key>_cloud` and `<serial>_<key>_local` are created
+  disabled by default; an option enables them.
+- Local-only datapoints (direction, physical stage, coupling, heartbeat age,
+  local link) and the diagnostic `data_source` are normal entities.
+- The attribute `source` is recorded; `age_s` must not be recorded.
+
+### Persistence
+
+`export_topology()` / `import_topology()` exchange plain dictionaries (device
+serial, house, zone index, role, type) for a Home Assistant `Store`, so UDP
+frames can be mapped to devices before the first cloud poll.
