@@ -13,11 +13,13 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from aiohttp import ClientError, ClientResponse, ClientSession
+from aiohttp import ClientError, ClientResponse, ClientSession, ClientTimeout
 
 from .const import (
+    CONNECT_TIMEOUT,
     HUMIDITY_LEVELS,
     LIGHT_SENSOR_LEVELS,
+    MAX_CONCURRENT_COMMANDS,
     MAX_CONCURRENT_REQUESTS,
     OPERATING_MODES,
     REQUEST_TIMEOUT,
@@ -25,6 +27,12 @@ from .const import (
 )
 
 LOGGER = logging.getLogger(__name__)
+
+# Commands and discovery retry transient failures; polling requests make one
+# attempt because the next poll is the retry.
+DEFAULT_ATTEMPTS = 3
+POLL_ATTEMPTS = 1
+MAX_SHAPE_DEPTH = 4
 
 
 class AmbientikaApiError(Exception):
@@ -173,7 +181,9 @@ class RequestMetrics:
     rate_limit_events: int = 0
     token_refreshes: int = 0
     last_request_duration_ms: int | None = None
+    last_semaphore_wait_ms: int | None = None
     last_error: dict[str, Any] | None = None
+    last_response_shapes: dict[str, Any] = field(default_factory=dict)
 
     def record_error(
         self,
@@ -198,6 +208,7 @@ class RequestMetrics:
         data = asdict(self)
         data["status_groups"] = dict(self.status_groups)
         data["error_kinds"] = dict(self.error_kinds)
+        data["last_response_shapes"] = dict(self.last_response_shapes)
         return data
 
 
@@ -230,12 +241,19 @@ class AmbientikaApiClient:
         self._token_callback = token_callback
         self._auth_lock = asyncio.Lock()
         self._semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+        # Commands never queue behind a hanging poll.
+        self._command_semaphore = asyncio.Semaphore(MAX_CONCURRENT_COMMANDS)
         self.metrics = RequestMetrics()
 
     @property
     def user_id(self) -> int | None:
         """Return the authenticated account identifier."""
         return self._user_id
+
+    @property
+    def token_expires_at(self) -> str | None:
+        """Return the expiry timestamp of the current token, if known."""
+        return self._expires_at
 
     async def async_authenticate(self) -> AmbientikaToken:
         """Authenticate with user credentials and retain the returned JWT."""
@@ -278,6 +296,26 @@ class AmbientikaApiClient:
         self.metrics.token_refreshes += 1
         return self._store_token(user_id, token, _date_text(expires_at))
 
+    async def async_renew_token_if_due(self, within: timedelta) -> bool:
+        """Refresh the token early when it expires within ``within``.
+
+        A refresh returns a new 180-day token and leaves old tokens valid, so
+        renewing well ahead of the expiry reveals problems weeks earlier. The
+        stored credentials are used when the old token is already rejected.
+        Returns whether a new token was obtained.
+        """
+        if self._token is None or not _expires_within(self._expires_at, within):
+            return False
+        async with self._auth_lock:
+            if self._token is None or not _expires_within(self._expires_at, within):
+                return False
+            try:
+                await self.async_refresh_token()
+            except AmbientikaAuthError:
+                self._token = None
+                await self.async_authenticate()
+            return True
+
     async def async_houses_info(self) -> list[object]:
         """Return all houses and their device metadata."""
         payload = await self._request("GET", "/House/houses-info")
@@ -301,6 +339,7 @@ class AmbientikaApiClient:
             "/Device/device-status",
             params={"deviceSerialNumber": serial_number},
             context=CONTEXT_DEVICE_STATUS,
+            attempts=POLL_ATTEMPTS,
         )
         if not isinstance(payload, dict):
             self.metrics.parser_errors += 1
@@ -314,6 +353,7 @@ class AmbientikaApiClient:
             "/Device/house-devices-status",
             params={"houseId": str(house_id)},
             context=CONTEXT_HOUSE_STATUS,
+            attempts=POLL_ATTEMPTS,
         )
         if not isinstance(payload, dict):
             self.metrics.parser_errors += 1
@@ -323,7 +363,10 @@ class AmbientikaApiClient:
     async def async_schedule(self, device_id: int) -> dict[str, Any]:
         """Return the weekly schedule configured for one device."""
         payload = await self._request(
-            "GET", f"/Schedule/{device_id}", context=CONTEXT_SCHEDULE
+            "GET",
+            f"/Schedule/{device_id}",
+            context=CONTEXT_SCHEDULE,
+            attempts=POLL_ATTEMPTS,
         )
         if not isinstance(payload, dict):
             self.metrics.parser_errors += 1
@@ -402,28 +445,27 @@ class AmbientikaApiClient:
         ensure_token: bool = True,
         recover_auth: bool = True,
         context: str | None = None,
+        attempts: int = DEFAULT_ATTEMPTS,
     ) -> Any:
         """Perform one logical request with bounded transient retries."""
         if authenticated and ensure_token:
             await self._ensure_token()
 
         endpoint = _endpoint_label(path)
+        pool = (
+            self._command_semaphore if context == CONTEXT_COMMAND else self._semaphore
+        )
+        attempt = 0
         auth_recovered = False
-        for attempt in range(3):
+        while True:
+            sent_token = self._token if authenticated else None
             headers = {}
-            if authenticated and self._token:
-                headers["Authorization"] = f"Bearer {self._token}"
-            started = time.monotonic()
+            if sent_token:
+                headers["Authorization"] = f"Bearer {sent_token}"
             try:
-                async with self._semaphore, asyncio.timeout(REQUEST_TIMEOUT):
-                    response = await self._session.request(
-                        method,
-                        f"{self._base_url}{path}",
-                        params=params,
-                        json=json_body,
-                        headers=headers,
-                    )
-                    payload = await _response_payload(response)
+                response, payload = await self._send(
+                    pool, method, path, params, json_body, headers
+                )
             except (TimeoutError, ClientError) as err:
                 kind = "timeout" if isinstance(err, TimeoutError) else "connection"
                 self.metrics.failed_requests += 1
@@ -435,8 +477,9 @@ class AmbientikaApiClient:
                     attempt + 1,
                     kind,
                 )
-                if attempt < 2:
+                if attempt + 1 < attempts:
                     await asyncio.sleep(_backoff(attempt))
+                    attempt += 1
                     continue
                 raise AmbientikaConnectionError(
                     "Ambientika cloud is unreachable", kind=kind
@@ -445,15 +488,12 @@ class AmbientikaApiClient:
                 self.metrics.failed_requests += 1
                 self.metrics.record_error(err.kind, endpoint=endpoint)
                 raise
-            finally:
-                self.metrics.last_request_duration_ms = round(
-                    (time.monotonic() - started) * 1000
-                )
 
             status = response.status
             self.metrics.status_groups[f"{status // 100}xx"] += 1
             if 200 <= status < 300:
                 self.metrics.successful_requests += 1
+                self.metrics.last_response_shapes[endpoint] = _shape(payload)
                 return payload
 
             self.metrics.failed_requests += 1
@@ -479,20 +519,60 @@ class AmbientikaApiClient:
             )
             if status == 401 and authenticated and recover_auth and not auth_recovered:
                 auth_recovered = True
-                self._token = None
-                await self._ensure_token()
+                await self._recover_auth(sent_token)
                 continue
             if status == 429:
                 self.metrics.rate_limit_events += 1
-                if attempt < 2:
+                if attempt + 1 < attempts:
                     await asyncio.sleep(_retry_after(response, attempt))
+                    attempt += 1
                     continue
-            elif status >= 500 and attempt < 2:
+            elif status >= 500 and attempt + 1 < attempts:
                 await asyncio.sleep(_backoff(attempt))
+                attempt += 1
                 continue
             raise error
 
-        raise AmbientikaApiError("Ambientika request failed")
+    async def _send(
+        self,
+        pool: asyncio.Semaphore,
+        method: str,
+        path: str,
+        params: dict[str, str] | None,
+        json_body: dict[str, Any] | None,
+        headers: dict[str, str],
+    ) -> tuple[ClientResponse, Any]:
+        """Send one HTTP request; the duration excludes the queueing time."""
+        queued = time.monotonic()
+        async with pool:
+            started = time.monotonic()
+            self.metrics.last_semaphore_wait_ms = round((started - queued) * 1000)
+            try:
+                async with asyncio.timeout(REQUEST_TIMEOUT):
+                    response = await self._session.request(
+                        method,
+                        f"{self._base_url}{path}",
+                        params=params,
+                        json=json_body,
+                        headers=headers,
+                        timeout=ClientTimeout(
+                            total=REQUEST_TIMEOUT, connect=CONNECT_TIMEOUT
+                        ),
+                    )
+                    payload = await _response_payload(response)
+            finally:
+                self.metrics.last_request_duration_ms = round(
+                    (time.monotonic() - started) * 1000
+                )
+        return response, payload
+
+    async def _recover_auth(self, rejected_token: str | None) -> None:
+        """Log in again, unless another request already renewed the token."""
+        async with self._auth_lock:
+            if self._token is not None and self._token != rejected_token:
+                return
+            self._token = None
+            await self.async_authenticate()
 
     def _store_token(
         self, user_id: int, token: str, expires_at: str
@@ -647,6 +727,11 @@ def _date_text(value: object) -> str:
 
 def _expires_soon(value: str | None) -> bool:
     """Return whether the token is absent, invalid, or close to expiry."""
+    return _expires_within(value, timedelta(minutes=5))
+
+
+def _expires_within(value: str | None, margin: timedelta) -> bool:
+    """Return whether the token is absent, invalid, or expires within ``margin``."""
     if value is None:
         return True
     try:
@@ -655,7 +740,22 @@ def _expires_soon(value: str | None) -> bool:
             expires = expires.replace(tzinfo=UTC)
     except ValueError:
         return True
-    return expires <= datetime.now(UTC) + timedelta(minutes=5)
+    return expires <= datetime.now(UTC) + margin
+
+
+def _shape(value: object, depth: int = 0) -> Any:
+    """Describe the structure of a payload (keys and types, never values)."""
+    if isinstance(value, dict):
+        if depth >= MAX_SHAPE_DEPTH:
+            return "object"
+        return {str(key): _shape(child, depth + 1) for key, child in value.items()}
+    if isinstance(value, list):
+        if not value:
+            return []
+        if depth >= MAX_SHAPE_DEPTH:
+            return f"list[{len(value)}]"
+        return [_shape(value[0], depth + 1), f"{len(value)} item(s)"]
+    return type(value).__name__
 
 
 def _validate_choice(name: str, value: str, choices: tuple[str, ...]) -> None:

@@ -12,8 +12,25 @@ INTEGRATION_VERSION: Final = "0.9.3"
 DEFAULT_BASE_URL: Final = "https://app.ambientika.eu:4521"
 DEFAULT_SCAN_INTERVAL: Final = timedelta(seconds=60)
 DISCOVERY_INTERVAL: Final = timedelta(hours=6)
-REQUEST_TIMEOUT: Final = 20
+REQUEST_TIMEOUT: Final = 10
+CONNECT_TIMEOUT: Final = 5
+# Idle connections are kept slightly shorter than the cloud's ~130 s so that
+# the next poll reuses the TLS connection instead of opening a new one.
+KEEPALIVE_TIMEOUT: Final = 120
 MAX_CONCURRENT_REQUESTS: Final = 3
+MAX_CONCURRENT_COMMANDS: Final = 2
+
+CONF_SCAN_INTERVAL: Final = "scan_interval"
+MIN_SCAN_INTERVAL: Final = 30
+MAX_SCAN_INTERVAL: Final = 600
+# After a command or a change the cloud is polled at the minimum interval for a
+# while, because the device uploads a status packet about every 30 s.
+FAST_POLL_DURATION: Final = timedelta(minutes=3)
+# Consecutive failed polls stretch the interval up to this limit.
+MAX_BACKOFF_INTERVAL: Final = timedelta(minutes=10)
+TOKEN_RENEW_BEFORE: Final = timedelta(days=30)
+TOKEN_CHECK_INTERVAL: Final = timedelta(days=1)
+EVENT_DEVICE_CHANGED: Final = f"{DOMAIN}_device_changed"
 
 CONF_BASE_URL: Final = "base_url"
 CONF_EXPIRES_AT: Final = "expires_at"
@@ -55,6 +72,9 @@ GEMINI_OPERATING_MODES: Final = (
     "Intake",
     "Off",
 )
+# Legacy firmware may still report the retired "Turbo" mode (numeric 12). It is
+# shown read-only and never written.
+REPORTED_OPERATING_MODES: Final = (*OPERATING_MODES, "Turbo")
 USER_OPERATING_MODES: Final = OPERATING_MODES[:-1]
 FAN_SPEEDS: Final = ("Low", "Medium", "High", "Night", "Turbo")
 WRITABLE_FAN_SPEEDS: Final = ("Low", "Medium", "High", "Turbo")
