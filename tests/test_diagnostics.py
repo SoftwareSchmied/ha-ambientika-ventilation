@@ -61,6 +61,11 @@ async def test_diagnostics_redact_credentials_and_identifiers(hass) -> None:
     output = repr(result)
 
     assert result["devices"][0]["redacted_id"] == "***EEFF"
+    assert result["coordinator"]["last_failure_causes"] == []
+    assert result["coordinator"]["discovery_failures"] == 0
+    assert result["coordinator"]["next_discovery_attempt"] is None
+    assert result["request_metrics"]["error_kinds"] == {}
+    assert result["request_metrics"]["last_error"] is None
     assert serial not in output
     assert "private@example.com" not in output
     assert "top-secret" not in output

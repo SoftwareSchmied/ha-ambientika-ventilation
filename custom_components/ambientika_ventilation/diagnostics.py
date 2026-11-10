@@ -111,10 +111,22 @@ async def async_get_config_entry_diagnostics(
             ),
             "last_update_duration_ms": coordinator.last_update_duration_ms,
             "partial_failures": coordinator.last_partial_failures,
+            "last_failure_causes": list(
+                getattr(coordinator, "last_failure_causes", ())
+            ),
+            "discovery_failures": getattr(coordinator, "discovery_failures", 0),
+            "next_discovery_attempt": _isoformat(
+                getattr(coordinator, "next_discovery_attempt", None)
+            ),
         },
         "request_metrics": runtime.api.metrics.as_dict(),
         "devices": devices,
     }
+
+
+def _isoformat(value: Any) -> str | None:
+    """Return an ISO timestamp for optional datetimes."""
+    return value.isoformat() if value is not None else None
 
 
 def _redact_identifier(value: str) -> str:
