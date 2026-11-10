@@ -85,6 +85,7 @@ class AmbientikaLocal:
         self.mode = local_mode(entry)
         self.probe_state = PROBE_IDLE
         self._probe_detected = False
+        self._probe_report: dict[str, Any] = {}
         self._enabled = False
         self._dirty = False
         self._listeners: dict[int, AmbientikaUdpListener] = {}
@@ -161,6 +162,7 @@ class AmbientikaLocal:
             "probe": {
                 "detected": self._probe_detected,
                 "at": datetime.now(UTC).isoformat(),
+                "report": self._probe_report,
             },
         }
 
@@ -288,8 +290,7 @@ class AmbientikaLocal:
         else:
             _LOGGER.debug("No local UDP broadcasts seen; the cloud is used alone")
 
-    @staticmethod
-    async def _probe_house(house: int, zones: set[int]) -> bool:
+    async def _probe_house(self, house: int, zones: set[int]) -> bool:
         reports: list[dict[str, Any]] = []
         try:
             frames = await probe(
@@ -301,10 +302,18 @@ class AmbientikaLocal:
             )
         except OSError as err:
             _LOGGER.info("Local UDP probe could not bind: %s", err)
+            self._probe_report = {"bind_error": str(err)}
             return False
         heard = any(frames.values())
+        report = reports[0] if reports else {}
+        self._probe_report = {
+            "zones": sorted(zones),
+            "frames": {str(zone): len(seen) for zone, seen in sorted(frames.items())},
+            "bound_ports": report.get("bound_ports"),
+            "bind_errors": report.get("bind_errors") or {},
+            "rejects": report.get("rejects") or {},
+        }
         if not heard:
-            report = reports[0] if reports else {}
             _LOGGER.info(
                 "Local UDP probe heard no broadcasts of this account in %.0f s "
                 "(zones %s, bound ports %s, bind errors %s, rejected frames %s)",
@@ -378,6 +387,7 @@ class AmbientikaLocal:
             "enabled": self._enabled,
             "probe_state": self.probe_state,
             "probe_detected_before": self._probe_detected,
+            "probe_report": self._probe_report,
             "houses": len(self._zones_by_house()),
             "listeners": listeners,
             "refreshes_requested": self._refreshes_requested,
