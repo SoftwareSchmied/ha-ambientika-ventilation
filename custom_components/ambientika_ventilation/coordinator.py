@@ -55,6 +55,7 @@ from .errors import (
     update_failed,
     validation_error,
 )
+from .hub import AmbientikaHub, CloudHealth
 from .models import (
     AmbientikaData,
     AmbientikaDevice,
@@ -106,6 +107,11 @@ READBACK_ATTEMPTS = 2
 WRITE_BATCH_DELAY = 0.4
 # A poll started this soon after a command may still carry the old state.
 STATUS_SETTLE_TIME = 3.0
+
+# A command's expected value wins over the cloud until the cloud confirms it:
+# the cloud reflects it after a few seconds and the next poll follows within the
+# fast poll interval.
+EXPECTED_COMMAND_TTL = 60.0
 
 MAX_CYCLE_HISTORY = 20
 MAX_FIRMWARE_HISTORY = 10
@@ -220,6 +226,11 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         self._topology: object = None
         self._topology_listeners: dict[int, CALLBACK_TYPE] = {}
         self._topology_listener_id = 0
+        self.hub: AmbientikaHub | None = None
+        """Hybrid data hub, set by the setup before the first refresh."""
+        self._last_success_mono: float | None = None
+        self._last_failure_mono: float | None = None
+        self._last_change_mono: float | None = None
         self.consecutive_failures = 0
         self.offline_devices: set[str] = set()
         self.offline_transitions = 0
@@ -306,11 +317,54 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         except UpdateFailed:
             if self._cycle_outage:
                 self.consecutive_failures += 1
+            self._last_failure_mono = time.monotonic()
             self._apply_interval()
+            self._publish_health()
             raise
         self.consecutive_failures = 0
         self._apply_interval()
+        self._publish_poll(data)
         return data
+
+    def cloud_health(self) -> CloudHealth:
+        """Summarize the polling health for the hub (monotonic timestamps)."""
+        metrics = self.api.metrics
+        last_error = metrics.last_error
+        duration = metrics.last_request_duration_ms
+        return CloudHealth(
+            last_success_at=self._last_success_mono,
+            last_failure_at=self._last_failure_mono,
+            consecutive_failures=self.consecutive_failures,
+            last_failure_kind=last_error["kind"] if last_error else None,
+            failures_by_kind=dict(metrics.error_kinds),
+            requests_total=metrics.successful_requests + metrics.failed_requests,
+            failures_total=metrics.failed_requests,
+            last_latency_s=None if duration is None else duration / 1000,
+            last_change_at=self._last_change_mono,
+        )
+
+    def _publish_health(self) -> None:
+        if self.hub is not None:
+            self.hub.update_cloud_health(self.cloud_health())
+
+    def _publish_poll(self, data: AmbientikaData) -> None:
+        """Feed the hub after every successful poll, also an unchanged one.
+
+        Offline devices count as failed for the hub: their kept status is old
+        and must not keep the cloud value fresh.
+        """
+        now = time.monotonic()
+        self._last_success_mono = now
+        if data != self.data:
+            self._last_change_mono = now
+        hub = self.hub
+        if hub is None:
+            return
+        hub.update_cloud_health(self.cloud_health(), at=now)
+        hub.update_cloud(
+            replace(data, failed_devices=data.failed_devices | data.offline_devices),
+            at=now,
+        )
 
     def _apply_interval(self) -> None:
         """Choose the next poll interval.
@@ -1077,6 +1131,8 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         """Send one validated command and confirm it with a delayed read-back."""
         async with self._write_lock(serial):
             plan = self._plan_write(serial, fields)
+            if self.hub is not None:
+                self.hub.set_expected(serial, plan.expected, ttl=EXPECTED_COMMAND_TTL)
             try:
                 await self.api.async_change_mode(
                     serial,
@@ -1084,9 +1140,11 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
                     schedule_mode=plan.schedule_mode,
                 )
             except AmbientikaAuthError as err:
+                self._clear_expected(serial, plan.expected)
                 self.config_entry.async_start_reauth(self.hass)
                 raise action_error("auth_failed") from err
             except AmbientikaDeviceOfflineError as err:
+                self._clear_expected(serial, plan.expected)
                 LOGGER.debug(
                     "Ambientika device %s did not respond: %s",
                     mask_serial(serial),
@@ -1094,6 +1152,7 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
                 )
                 raise action_error("device_offline") from err
             except (AmbientikaApiError, ValueError) as err:
+                self._clear_expected(serial, plan.expected)
                 LOGGER.debug(
                     "Ambientika command for %s failed: %s",
                     mask_serial(serial),
@@ -1131,6 +1190,11 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             refreshed = _with_expected(latest or plan.status, plan.expected)
         self._remember_writable(serial, refreshed)
         self._apply_status(serial, refreshed)
+
+    def _clear_expected(self, serial: str, expected: dict[str, str]) -> None:
+        """Forget the pending values of a command that was not accepted."""
+        if self.hub is not None:
+            self.hub.clear_expected(serial, expected)
 
     async def _async_read_back(
         self, serial: str, matches: Callable[[AmbientikaStatus], bool]

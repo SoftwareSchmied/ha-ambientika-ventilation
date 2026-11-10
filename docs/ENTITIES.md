@@ -47,6 +47,40 @@ section "Schedules".
 | Binary sensor | `schedule` | Weekly schedule is active |
 | Binary sensor | `cloud_connection` | The cloud has current status data for the unit (diagnostic; available while the unit is offline) |
 
+## Local data and data sources
+
+Every value that both the cloud and the local UDP broadcast can provide has an
+effective entity (the existing unique ID `<serial>_<key>`), which prefers the
+local value while it is fresh, plus a cloud and a local variant. See
+[Local data](../README.md#local-data) for the setup and the options.
+
+| Platform | Unique ID | Meaning | Default | Recorded |
+| --- | --- | --- | --- | --- |
+| Binary sensor | `<serial>_power` | Unit is on (local: moving air or non-idle coupling; otherwise pending command or cloud mode) | Enabled | Yes, attribute `source` |
+| Binary sensor | `<serial>_running` | Air is physically moving (local direction, cloud mode as fallback) | Enabled | Yes, attribute `source` |
+| Binary sensor | `<serial>_power_cloud`, `_power_local`, `_running_cloud`, `_running_local` | Raw value of one source | Disabled | Yes |
+| Sensor | `<serial>_direction` | Physical direction: stopped, exhaust, intake | Enabled | Yes |
+| Sensor | `<serial>_physical_stage` | Physical fan stage: night, low, medium, high; unknown while idle | Enabled | Yes |
+| Sensor | `<serial>_coupling` | Zone coupling: idle, opposite, same | Enabled | Yes |
+| Sensor | `<serial>_data_source` | `local_udp`, `cloud`, `degraded` or `offline` (diagnostic) | Enabled | Yes |
+| Sensor | `<serial>_last_local_frame` | Time of the last local frame (diagnostic, written at most once per minute) | Enabled | Yes |
+| Sensor | `<serial>_last_seen` | Latest sign of life from cloud or local (diagnostic, written at most once per minute) | Enabled | Yes |
+| Sensor | `<serial>_last_seen_cloud`, `_last_seen_local` | Raw value of one source | Disabled | Yes |
+| Sensor | `<serial>_heartbeat_age` | Seconds since the last local frame (diagnostic, written at most once per minute) | Disabled | Snapshot every minute, no statistics |
+| Binary sensor | `<entry id>_cloud_reachable` | Cloud delivered data recently and without repeated failures (account device) | Enabled | Yes |
+| Sensor | `<entry id>_cloud_consecutive_failures` | Failed polls in a row (account device) | Enabled | Yes |
+| Sensor | `<entry id>_cloud_success_rate`, `_cloud_last_latency`, `_cloud_last_success`, `_cloud_last_failure_kind` | Request health (account device) | Disabled | Yes |
+
+The effective entities carry the attribute `source` (`local_udp`, `expected`,
+`cloud`, `cloud_heuristic`), which has few distinct values and is recorded,
+and `age_s`, which changes constantly and is excluded from the recorder.
+The raw variants are created disabled; the option "Create raw source variants"
+creates or enables them.
+
+The fan state, presets, percentage and the selects keep following the cloud
+setting (and the commands you just sent), never the local broadcast, so a unit
+that idles in Away mode is not shown as off.
+
 ## Diagnostic entities
 
 The following entities are disabled by default to limit state-history and UI

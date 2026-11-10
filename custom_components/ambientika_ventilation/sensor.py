@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -13,9 +15,15 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
+from homeassistant.const import (
+    PERCENTAGE,
+    EntityCategory,
+    UnitOfTemperature,
+    UnitOfTime,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from . import AmbientikaRuntimeData
 from .const import (
@@ -25,7 +33,22 @@ from .const import (
     REPORTED_OPERATING_MODES,
 )
 from .coordinator import AmbientikaCoordinator
-from .entity import AmbientikaEntity
+from .entity import (
+    AmbientikaCloudEntity,
+    AmbientikaEntity,
+    AmbientikaHubEntity,
+    HubFields,
+    hub_device_serials,
+    with_variants,
+)
+from .hub import (
+    DATA_SOURCE_CLOUD,
+    DATA_SOURCE_DEGRADED,
+    DATA_SOURCE_LOCAL,
+    DATA_SOURCE_OFFLINE,
+    AmbientikaHub,
+)
+from .local.models import Coupling, Direction, LocalSpeed
 from .models import AmbientikaDevice, AmbientikaStatus
 
 PARALLEL_UPDATES = 0
@@ -50,6 +73,18 @@ class AmbientikaDeviceSensorDescription(SensorEntityDescription):
     value_fn: DeviceValueFn
     enum_values: tuple[str, ...] = ()
     attributes_fn: DeviceAttributesFn | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class AmbientikaHubSensorDescription(SensorEntityDescription, HubFields):
+    """Describe a sensor whose value comes from the hub."""
+
+
+@dataclass(frozen=True, kw_only=True)
+class AmbientikaCloudSensorDescription(SensorEntityDescription):
+    """Describe a cloud-health diagnostic of the account."""
+
+    value_fn: Callable[[AmbientikaHub], Any]
 
 
 SENSORS = (
@@ -243,6 +278,125 @@ DEVICE_SENSORS = (
 )
 
 
+def _options(enum: type[Direction] | type[Coupling] | type[LocalSpeed]) -> list[str]:
+    return [item.value for item in enum if item.value != "unknown"]
+
+
+HUB_SENSORS: tuple[AmbientikaHubSensorDescription, ...] = (
+    AmbientikaHubSensorDescription(
+        key="direction",
+        translation_key="direction",
+        datapoint="direction",
+        device_class=SensorDeviceClass.ENUM,
+        options=_options(Direction),
+    ),
+    AmbientikaHubSensorDescription(
+        key="physical_stage",
+        translation_key="physical_stage",
+        datapoint="physical_stage",
+        device_class=SensorDeviceClass.ENUM,
+        options=_options(LocalSpeed),
+    ),
+    AmbientikaHubSensorDescription(
+        key="coupling",
+        translation_key="coupling",
+        datapoint="coupling",
+        device_class=SensorDeviceClass.ENUM,
+        options=_options(Coupling),
+    ),
+    AmbientikaHubSensorDescription(
+        key="data_source",
+        translation_key="data_source",
+        datapoint="data_source",
+        device_class=SensorDeviceClass.ENUM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        options=[
+            DATA_SOURCE_LOCAL,
+            DATA_SOURCE_CLOUD,
+            DATA_SOURCE_DEGRADED,
+            DATA_SOURCE_OFFLINE,
+        ],
+    ),
+    AmbientikaHubSensorDescription(
+        key="heartbeat_age",
+        translation_key="heartbeat_age",
+        datapoint="heartbeat_age",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        suggested_display_precision=0,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        throttled=True,
+    ),
+    AmbientikaHubSensorDescription(
+        key="last_local_frame",
+        translation_key="last_local_frame",
+        datapoint="last_seen",
+        variant="local",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        throttled=True,
+    ),
+    *with_variants(
+        AmbientikaHubSensorDescription(
+            key="last_seen",
+            translation_key="last_seen",
+            datapoint="last_seen",
+            device_class=SensorDeviceClass.TIMESTAMP,
+            entity_category=EntityCategory.DIAGNOSTIC,
+            throttled=True,
+        )
+    ),
+)
+
+CLOUD_SENSORS: tuple[AmbientikaCloudSensorDescription, ...] = (
+    AmbientikaCloudSensorDescription(
+        key="cloud_consecutive_failures",
+        translation_key="cloud_consecutive_failures",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda hub: hub.cloud_health.consecutive_failures,
+    ),
+    AmbientikaCloudSensorDescription(
+        key="cloud_success_rate",
+        translation_key="cloud_success_rate",
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=1,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda hub: (
+            None
+            if hub.cloud_health.success_rate is None
+            else hub.cloud_health.success_rate * 100
+        ),
+    ),
+    AmbientikaCloudSensorDescription(
+        key="cloud_last_latency",
+        translation_key="cloud_last_latency",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda hub: hub.cloud_health.last_latency_s,
+    ),
+    AmbientikaCloudSensorDescription(
+        key="cloud_last_success",
+        translation_key="cloud_last_success",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda hub: hub.cloud_health.last_success_at,
+    ),
+    AmbientikaCloudSensorDescription(
+        key="cloud_last_failure_kind",
+        translation_key="cloud_last_failure_kind",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda hub: hub.cloud_health.last_failure_kind,
+    ),
+)
+
+
 def _enum_state(value: object, known: tuple[str, ...]) -> str | None:
     """Return the translated state of a known enum value, else unknown."""
     return API_TO_HA.get(value) if isinstance(value, str) and value in known else None
@@ -263,6 +417,9 @@ async def async_setup_entry(
     known_devices: set[str] = set()
     known_diagnostics: set[tuple[str, str]] = set()
     known_schedules: set[str] = set()
+    known_hub: set[str] = set()
+    runtime = entry.runtime_data
+    hub = runtime.hub
 
     @callback
     def add_new_entities() -> None:
@@ -290,10 +447,23 @@ async def async_setup_entry(
             if device_data.schedule is not None and serial not in known_schedules:
                 entities.append(AmbientikaScheduleSensor(coordinator, serial))
                 known_schedules.add(serial)
+        hub_serials = hub_device_serials(coordinator) - known_hub
+        entities.extend(
+            AmbientikaHubSensor(
+                coordinator, hub, serial, description, runtime.raw_variants
+            )
+            for serial in sorted(hub_serials)
+            for description in HUB_SENSORS
+        )
         if entities:
             async_add_entities(entities)
             known_devices.update(serials)
+            known_hub.update(hub_serials)
 
+    async_add_entities(
+        AmbientikaCloudSensor(entry.entry_id, hub, description)
+        for description in CLOUD_SENSORS
+    )
     add_new_entities()
     entry.async_on_unload(coordinator.async_add_topology_listener(add_new_entities))
 
@@ -420,3 +590,67 @@ class AmbientikaScheduleSensor(AmbientikaEntity, SensorEntity):
                 for slot in schedule.time_slots
             ],
         }
+
+
+class AmbientikaHubSensor(AmbientikaHubEntity, SensorEntity):
+    """Sensor whose value is resolved by the hub from cloud and local data."""
+
+    entity_description: AmbientikaHubSensorDescription
+
+    def __init__(
+        self,
+        coordinator: AmbientikaCoordinator,
+        hub: AmbientikaHub,
+        serial: str,
+        description: AmbientikaHubSensorDescription,
+        raw_variants: bool = False,
+    ) -> None:
+        """Initialize the hub-backed sensor."""
+        super().__init__(coordinator, hub, serial, description, raw_variants)
+        self.entity_description = description
+
+    @property
+    def native_value(self) -> Any:
+        """Return the resolved value; enum values outside the options are unknown."""
+        value = self.hub_value
+        options = self.entity_description.options
+        if options is not None and value not in options:
+            return None
+        return value
+
+
+class AmbientikaCloudSensor(AmbientikaCloudEntity, SensorEntity):
+    """Cloud-health diagnostic of the account."""
+
+    entity_description: AmbientikaCloudSensorDescription
+
+    def __init__(
+        self,
+        entry_id: str,
+        hub: AmbientikaHub,
+        description: AmbientikaCloudSensorDescription,
+    ) -> None:
+        """Initialize the cloud-health sensor."""
+        super().__init__(entry_id, hub, description.key)
+        self.entity_description = description
+        self._wall: tuple[float, datetime] | None = None
+
+    @property
+    def native_value(self) -> Any:
+        """Return the health value; monotonic stamps become wall clock times."""
+        value = self.entity_description.value_fn(self._hub)
+        if self.entity_description.device_class is not SensorDeviceClass.TIMESTAMP:
+            return value
+        if value is None:
+            return None
+        if self._wall is None or self._wall[0] != value:
+            age = timedelta(seconds=max(time.monotonic() - value, 0.0))
+            self._wall = (value, (dt_util.utcnow() - age).replace(microsecond=0))
+        return self._wall[1]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Show the failure counts by kind next to the last failure kind."""
+        if self.entity_description.key != "cloud_last_failure_kind":
+            return None
+        return dict(self._hub.cloud_health.failures_by_kind) or None

@@ -10,6 +10,7 @@ import pytest
 from custom_components.ambientika_ventilation import async_remove_config_entry_device
 from custom_components.ambientika_ventilation.api import AmbientikaResponseError
 from custom_components.ambientika_ventilation.const import (
+    CLOUD_DEVICE_PREFIX,
     DOMAIN,
     STALE_DEVICE_DISCOVERIES,
     STALE_DEVICE_MIN_AGE,
@@ -151,3 +152,29 @@ async def test_coordinator_only_counts_successful_discoveries(
     with pytest.raises(AmbientikaResponseError):
         await coordinator._async_discover()
     assert coordinator.stale_devices.missing == {"998877665544": 1}
+
+
+async def test_cloud_service_device_is_never_removed(hass) -> None:
+    """The account-level cloud device has no serial and must survive discoveries."""
+    entry = MockConfigEntry(domain=DOMAIN, data={})
+    entry.add_to_hass(hass)
+    cloud_id = f"{CLOUD_DEVICE_PREFIX}{entry.entry_id}"
+    devices = _add_devices(hass, entry, KEPT, cloud_id)
+    assert device_serials(devices[cloud_id]) == set()
+    assert is_removable([KEPT], devices[cloud_id]) is False
+
+    entry.runtime_data = type(
+        "Runtime", (), {"coordinator": AsyncMock(data=AsyncMock(devices={KEPT: 1}))}
+    )()
+    removable = await async_remove_config_entry_device(hass, entry, devices[cloud_id])
+    assert removable is False
+
+    tracker = StaleDeviceTracker(hass, entry)
+    start = dt_util.utcnow()
+    for step in range(STALE_DEVICE_DISCOVERIES + 2):
+        with patch(
+            "custom_components.ambientika_ventilation.stale.dt_util.utcnow",
+            return_value=start + STALE_DEVICE_MIN_AGE * (step + 1),
+        ):
+            assert tracker.async_discovered([KEPT]) == []
+    assert _find(hass, entry, cloud_id) is not None

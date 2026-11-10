@@ -410,7 +410,7 @@ class AmbientikaHub:
 
         Changes of the effective value, the source, availability or any raw
         variant notify. Volatile datapoints (``last_seen``, ``heartbeat_age``)
-        only notify on availability and source changes.
+        only notify when the value or one of its variants becomes (un)available.
         """
         if key not in DATAPOINTS:
             raise KeyError(key)
@@ -685,9 +685,11 @@ class AmbientikaHub:
         description: DatapointDescription, resolved: ResolvedValue
     ) -> object:
         if description.volatile:
+            # The source of a "latest" value flips with every cloud poll and
+            # heartbeat, so only the availability of the value and of each
+            # variant notifies.
             return (
                 resolved.value is not None,
-                resolved.source,
                 tuple((s, v is not None) for s, v in resolved.variants.items()),
             )
         return (

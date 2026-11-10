@@ -148,3 +148,35 @@ def operating_modes_for_device(device_type: str | None) -> tuple[str, ...]:
 def mode_allows_setting(mode: str | None, field: str) -> bool:
     """Return whether the official app enables a setting in a mode."""
     return field in MODE_WRITABLE_FIELDS.get(mode or "", frozenset())
+
+
+# --- Hybrid cloud + local data model ---------------------------------------
+
+CONF_LOCAL_UDP: Final = "local_udp"
+CONF_RAW_VARIANTS: Final = "raw_variants"
+LOCAL_UDP_AUTO: Final = "auto"
+LOCAL_UDP_ON: Final = "on"
+LOCAL_UDP_OFF: Final = "off"
+LOCAL_UDP_MODES: Final = (LOCAL_UDP_AUTO, LOCAL_UDP_ON, LOCAL_UDP_OFF)
+DEFAULT_LOCAL_UDP: Final = LOCAL_UDP_AUTO
+DEFAULT_RAW_VARIANTS: Final = False
+
+# The cloud value stays usable for 2.5 scan intervals, at least 150 s.
+CLOUD_TTL_FACTOR: Final = 2.5
+MIN_CLOUD_TTL: Final = 150.0
+# The auto mode listens this long for the account's own broadcasts.
+PROBE_DURATION: Final = 60.0
+# A listener that hears nothing for this long raises a repair issue ("on").
+NO_FRAMES_AFTER: Final = 300.0
+# A UDP-driven change asks the cloud for confirmation at most this often.
+UDP_REFRESH_MIN_INTERVAL: Final = 30.0
+# Volatile diagnostics (heartbeat age, last seen) are written at most this often.
+THROTTLE_INTERVAL: Final = timedelta(seconds=60)
+
+STORE_VERSION: Final = 1
+STORE_KEY_PREFIX: Final = f"{DOMAIN}"
+ISSUE_LOCAL_UDP_BIND: Final = "local_udp_bind_failed"
+ISSUE_LOCAL_UDP_NO_FRAMES: Final = "local_udp_no_frames"
+
+# Identifier prefix of the account-level cloud device (not a unit serial).
+CLOUD_DEVICE_PREFIX: Final = "cloud_"

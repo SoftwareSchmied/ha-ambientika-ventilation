@@ -10,6 +10,7 @@ from custom_components.ambientika_ventilation.api import RequestMetrics
 from custom_components.ambientika_ventilation.diagnostics import (
     async_get_config_entry_diagnostics,
 )
+from custom_components.ambientika_ventilation.hub import AmbientikaHub
 from custom_components.ambientika_ventilation.models import (
     AmbientikaData,
     AmbientikaDevice,
@@ -56,6 +57,8 @@ async def test_diagnostics_redact_credentials_and_identifiers(hass) -> None:
             api=SimpleNamespace(
                 metrics=RequestMetrics(), token_expires_at="2027-01-01T00:00:00+00:00"
             ),
+            hub=AmbientikaHub(),
+            local=SimpleNamespace(diagnostics=lambda: {"mode": "auto"}),
         ),
         version=1,
         minor_version=1,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -37,6 +38,7 @@ async def test_setup_entry_builds_runtime_and_persists_refreshed_token(hass) -> 
     api = MagicMock()
     api.async_renew_token_if_due = AsyncMock(return_value=False)
     coordinator = MagicMock()
+    coordinator.base_interval = timedelta(seconds=60)
     coordinator.async_config_entry_first_refresh = AsyncMock()
     forward = AsyncMock()
     session = MagicMock()

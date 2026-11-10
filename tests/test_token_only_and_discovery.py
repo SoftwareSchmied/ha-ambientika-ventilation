@@ -125,6 +125,8 @@ async def test_failed_renewal_starts_reauthentication(hass, caplog) -> None:
     api.async_renew_token_if_due = AsyncMock(side_effect=AmbientikaAuthError)
     coordinator = MagicMock()
     coordinator.async_config_entry_first_refresh = AsyncMock()
+    coordinator.base_interval = timedelta(seconds=60)
+    coordinator.data = None
     session = MagicMock()
     session.close = AsyncMock()
 

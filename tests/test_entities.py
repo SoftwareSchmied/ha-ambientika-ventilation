@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -52,6 +51,8 @@ from custom_components.ambientika_ventilation.switch import (
 from homeassistant.components.fan import FanEntityFeature
 from homeassistant.components.sensor import SensorStateClass
 from homeassistant.exceptions import ServiceValidationError
+
+from .hub_helpers import fake_entry
 
 SERIAL = "AABBCCDDEEFF"
 
@@ -430,10 +431,7 @@ def test_schedule_sensor_and_missing_sensor_values() -> None:
 async def test_all_platform_setup_callbacks(hass) -> None:
     """Every platform creates only the entities supported by current data."""
     coordinator = coordinator_with_status()
-    entry = SimpleNamespace(
-        runtime_data=SimpleNamespace(coordinator=coordinator),
-        async_on_unload=MagicMock(),
-    )
+    entry = fake_entry(coordinator)
     setup_functions = (
         async_setup_binary_sensors,
         async_setup_buttons,
@@ -449,7 +447,7 @@ async def test_all_platform_setup_callbacks(hass) -> None:
         await setup(hass, entry, added.extend)
         counts.append(len(added))
 
-    assert counts == [5, 1, 1, 3, 9, 1]
+    assert counts == [12, 1, 1, 3, 23, 1]
     assert entry.async_on_unload.call_count == len(setup_functions)
 
 

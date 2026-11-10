@@ -150,3 +150,34 @@ def local(
         reversals=0,
         rejected=0,
     )
+
+
+def runtime(coordinator, hub: AmbientikaHub | None = None):
+    """Return runtime data shaped like the real one, with a mocked local manager."""
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    local_manager = MagicMock()
+    local_manager.diagnostics.return_value = {"mode": "auto"}
+    if hub is None:
+        hub = AmbientikaHub()
+        if isinstance(getattr(coordinator, "data", None), AmbientikaData):
+            hub.update_cloud(coordinator.data)
+    return SimpleNamespace(
+        coordinator=coordinator,
+        hub=hub,
+        local=local_manager,
+        raw_variants=False,
+    )
+
+
+def fake_entry(coordinator, hub: AmbientikaHub | None = None):
+    """Return a config entry stand-in for calling platform setup functions."""
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    return SimpleNamespace(
+        entry_id="entry1",
+        runtime_data=runtime(coordinator, hub),
+        async_on_unload=MagicMock(),
+    )

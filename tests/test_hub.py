@@ -71,31 +71,42 @@ def test_cloud_only_values_and_heuristic() -> None:
 
 
 def test_hysteresis_cloud_to_local_after_two_frames() -> None:
-    hub, clock = start()
+    hub, clock = start("Off")
     seen: list[ResolvedValue] = []
     hub.subscribe(MASTER, "power", seen.append)
-    hub.update_local(
-        local(clock, n=1, coupling=Coupling.IDLE, direction=Direction.STOPPED)
-    )
+    hub.update_local(local(clock, n=1))
     # One frame: cloud is still effective, local variant is already visible.
     power = hub.resolve(MASTER, "power")
-    assert (power.value, power.source) == (True, Source.CLOUD)
-    assert power.variants[Source.LOCAL_UDP] is False
+    assert (power.value, power.source) == (False, Source.CLOUD)
+    assert power.variants[Source.LOCAL_UDP] is True
     assert hub.data_source(MASTER) == "cloud"
     # Local-only values do not wait for a second frame (nothing to switch from).
-    assert hub.resolve(MASTER, "direction").value is Direction.STOPPED
+    assert hub.resolve(MASTER, "direction").value is Direction.EXHAUST
     clock.advance(27)
-    hub.update_local(
-        local(clock, n=2, coupling=Coupling.IDLE, direction=Direction.STOPPED)
-    )
+    hub.update_local(local(clock, n=2))
     power = hub.resolve(MASTER, "power")
-    assert (power.value, power.source) == (False, Source.LOCAL_UDP)
+    assert (power.value, power.source) == (True, Source.LOCAL_UDP)
     assert power.age_s == 0
     assert hub.data_source(MASTER) == "local_udp"
     assert [(r.value, r.source) for r in seen] == [
-        (True, Source.CLOUD),  # variant change from the first frame
-        (False, Source.LOCAL_UDP),
+        (False, Source.CLOUD),  # variant change from the first frame
+        (True, Source.LOCAL_UDP),
     ]
+
+
+def test_idle_local_frame_makes_no_power_claim() -> None:
+    """Away mode idles locally for long periods while the unit is on."""
+    hub, clock = start("AwayHome")
+    engage(hub, clock, coupling=Coupling.IDLE, direction=Direction.STOPPED)
+    power = hub.resolve(MASTER, "power")
+    assert (power.value, power.source) == (True, Source.CLOUD)
+    assert power.variants[Source.LOCAL_UDP] is None
+    assert hub.data_source(MASTER) == "local_udp"
+    # The idle frame still tells the physical state.
+    assert hub.resolve(MASTER, "running").value is False
+    assert hub.resolve(MASTER, "physical_stage").value is None
+    hub.set_expected(MASTER, {"operating_mode": "Off"})
+    assert hub.resolve(MASTER, "power").source is Source.EXPECTED
 
 
 def test_repeated_state_object_does_not_count_as_frame() -> None:
@@ -109,7 +120,7 @@ def test_repeated_state_object_does_not_count_as_frame() -> None:
 
 def test_local_to_cloud_immediately_when_stale() -> None:
     hub, clock = start()
-    engage(hub, clock, coupling=Coupling.IDLE, direction=Direction.STOPPED)
+    engage(hub, clock)
     seen: list[ResolvedValue] = []
     hub.subscribe(MASTER, "power", seen.append)
     assert hub.resolve(MASTER, "power").source is Source.LOCAL_UDP
@@ -194,7 +205,11 @@ def test_settings_ignore_udp() -> None:
     assert hub.resolve(MASTER, "operating_mode").value == "ManualHeatRecovery"
     assert hub.resolve(MASTER, "operating_mode").source is Source.CLOUD
     assert hub.resolve(MASTER, "fan_speed").value == "Medium"
-    # UDP stage and cloud setting are separate, non-conflicting datapoints.
+    # UDP stage and cloud setting are separate, non-conflicting datapoints; an
+    # idle unit reports no running stage.
+    assert hub.resolve(MASTER, "physical_stage").value is None
+    engage_more = local(clock, n=9, coupling=Coupling.OPPOSITE)
+    hub.update_local(engage_more)
     assert hub.resolve(MASTER, "physical_stage").value is LocalSpeed.MEDIUM
     assert hub.liveness(MASTER).conflicts == 0  # type: ignore[union-attr]
 
@@ -335,7 +350,7 @@ def test_cloud_variant_change_notifies_even_if_effective_is_local() -> None:
     assert seen[0].variants[Source.CLOUD] is False
 
 
-def test_volatile_notifies_on_availability_and_source_only() -> None:
+def test_volatile_notifies_on_availability_only() -> None:
     hub, clock = start()
     ages: list[ResolvedValue] = []
     seen: list[ResolvedValue] = []
@@ -351,6 +366,10 @@ def test_volatile_notifies_on_availability_and_source_only() -> None:
     clock.advance(100)
     hub.evaluate()  # stale, still reports the age
     assert hub.resolve(MASTER, "heartbeat_age").value == 100.0
+    assert (len(ages), len(seen)) == before
+    # A newer cloud poll flips the source of the latest timestamp: no notification.
+    hub.update_cloud(cloud(device()))
+    assert hub.resolve(MASTER, "last_seen").source is Source.CLOUD
     assert (len(ages), len(seen)) == before
 
 
@@ -452,8 +471,9 @@ def test_slave_direction_is_derived_from_coupling() -> None:
         local(clock, n=3, coupling=Coupling.IDLE, direction=Direction.EXHAUST)
     )
     assert hub.resolve(SLAVE, "direction").value is Direction.STOPPED
-    assert hub.resolve(SLAVE, "power").value is False
+    assert hub.resolve(SLAVE, "power").source is Source.CLOUD
     assert hub.resolve(SLAVE, "running").value is False
+    assert hub.resolve(SLAVE, "physical_stage").value is None
 
 
 def test_not_configured_device_has_no_local_view() -> None:
@@ -503,12 +523,12 @@ def test_conflict_counted_after_more_than_two_cloud_cycles() -> None:
     liveness = hub.liveness(MASTER)
     assert liveness is not None
     assert (liveness.conflicts, liveness.in_conflict) == (1, False)
-    # A new local change restarts the grace period.
-    cycle("ManualHeatRecovery", coupling=Coupling.IDLE, direction=Direction.STOPPED)
-    cycle("ManualHeatRecovery", coupling=Coupling.IDLE, direction=Direction.STOPPED)
-    assert hub.liveness(MASTER).conflicts == 1  # type: ignore[union-attr]
-    cycle("ManualHeatRecovery", coupling=Coupling.IDLE, direction=Direction.STOPPED)
-    assert hub.liveness(MASTER).conflicts == 2  # type: ignore[union-attr]
+    # An idle frame makes no power claim, so it never disagrees with the cloud.
+    for _ in range(4):
+        cycle("Off", coupling=Coupling.IDLE, direction=Direction.STOPPED)
+    liveness = hub.liveness(MASTER)
+    assert liveness is not None
+    assert (liveness.conflicts, liveness.in_conflict) == (1, False)
 
 
 def test_no_conflict_without_local_or_cloud_value() -> None:

@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, EVENT_HOMEASSISTANT_CLOSE
-from homeassistant.core import Event, HomeAssistant
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util.ssl import client_context
 
@@ -22,20 +23,27 @@ from .api import (
     describe_error,
 )
 from .const import (
+    CLOUD_TTL_FACTOR,
     CONF_BASE_URL,
     CONF_EXPIRES_AT,
+    CONF_RAW_VARIANTS,
     CONF_TOKEN,
     CONF_USER_ID,
     CONNECT_TIMEOUT,
     DEFAULT_BASE_URL,
+    DEFAULT_RAW_VARIANTS,
     DOMAIN,
     KEEPALIVE_TIMEOUT,
+    MIN_CLOUD_TTL,
     PLATFORMS,
     REQUEST_TIMEOUT,
     TOKEN_CHECK_INTERVAL,
     TOKEN_RENEW_BEFORE,
 )
 from .coordinator import AmbientikaCoordinator
+from .datapoints import variant_keys
+from .hub import EVALUATE_INTERVAL_S, AmbientikaHub
+from .local_manager import AmbientikaLocal, make_store
 from .stale import is_removable
 
 LOGGER = logging.getLogger(__name__)
@@ -62,6 +70,9 @@ class AmbientikaRuntimeData:
 
     api: AmbientikaApiClient
     coordinator: AmbientikaCoordinator
+    hub: AmbientikaHub
+    local: AmbientikaLocal
+    raw_variants: bool = False
 
 
 AmbientikaConfigEntry = ConfigEntry[AmbientikaRuntimeData]
@@ -113,8 +124,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: AmbientikaConfigEntry) -
         token_callback=update_token,
     )
     coordinator = AmbientikaCoordinator(hass, entry, api)
+    hub = AmbientikaHub(cloud_ttl_s=cloud_ttl(coordinator.base_interval))
+    coordinator.hub = hub
+    local = AmbientikaLocal(hass, entry, coordinator, hub, make_store(hass, entry))
+    await local.async_load()
+    entry.async_on_unload(local.attach())
     await coordinator.async_config_entry_first_refresh()
-    entry.runtime_data = AmbientikaRuntimeData(api=api, coordinator=coordinator)
+    raw_variants = bool(entry.options.get(CONF_RAW_VARIANTS, DEFAULT_RAW_VARIANTS))
+    entry.runtime_data = AmbientikaRuntimeData(
+        api=api,
+        coordinator=coordinator,
+        hub=hub,
+        local=local,
+        raw_variants=raw_variants,
+    )
+
+    @callback
+    def evaluate_hub(_now: datetime) -> None:
+        hub.evaluate()
+        local.check()
+
+    entry.async_on_unload(
+        async_track_time_interval(
+            hass, evaluate_hub, timedelta(seconds=EVALUATE_INTERVAL_S)
+        )
+    )
+    entry.async_on_unload(local.async_stop)
 
     async def renew_token(_now: datetime | None = None) -> None:
         try:
@@ -136,13 +171,47 @@ async def async_setup_entry(hass: HomeAssistant, entry: AmbientikaConfigEntry) -
         async_track_time_interval(hass, renew_token, TOKEN_CHECK_INTERVAL)
     )
     await renew_token()
+    if raw_variants:
+        enable_variant_entities(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await local.async_start()
     return True
+
+
+def cloud_ttl(scan_interval: timedelta) -> float:
+    """Return how long a cloud poll counts as fresh (2.5 scan intervals, >= 150 s)."""
+    return max(MIN_CLOUD_TTL, CLOUD_TTL_FACTOR * scan_interval.total_seconds())
+
+
+def enable_variant_entities(hass: HomeAssistant, entry: AmbientikaConfigEntry) -> int:
+    """Enable the raw `_cloud`/`_local` variant entities; return how many changed.
+
+    Only entities disabled by the integration are touched, never a choice of
+    the user. Run before the platforms load so no reload is needed.
+    """
+    registry = er.async_get(hass)
+    suffixes = tuple(
+        f"_{key}_{variant}" for key in variant_keys() for variant in ("cloud", "local")
+    )
+    changed = 0
+    for item in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if (
+            item.disabled_by is er.RegistryEntryDisabler.INTEGRATION
+            and item.unique_id.endswith(suffixes)
+        ):
+            registry.async_update_entity(item.entity_id, disabled_by=None)
+            changed += 1
+    return changed
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: AmbientikaConfigEntry) -> bool:
     """Unload an Ambientika config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: AmbientikaConfigEntry) -> None:
+    """Delete the cached topology and probe result of a removed entry."""
+    await make_store(hass, entry).async_remove()
 
 
 async def async_remove_config_entry_device(

@@ -272,6 +272,70 @@
       },
       "schedule_entries": {
         "name": "Schedule entries"
+      },
+      "direction": {
+        "name": "Physical direction",
+        "state": {
+          "stopped": "Stopped",
+          "exhaust": "Exhaust",
+          "intake": "Intake"
+        }
+      },
+      "physical_stage": {
+        "name": "Physical fan stage",
+        "state": {
+          "night": "Night",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
+      },
+      "coupling": {
+        "name": "Zone coupling",
+        "state": {
+          "idle": "Idle",
+          "opposite": "Opposite",
+          "same": "Same"
+        }
+      },
+      "data_source": {
+        "name": "Data source",
+        "state": {
+          "local_udp": "Local (UDP)",
+          "cloud": "Cloud",
+          "degraded": "Degraded",
+          "offline": "Offline"
+        }
+      },
+      "heartbeat_age": {
+        "name": "Local heartbeat age"
+      },
+      "last_local_frame": {
+        "name": "Last local frame"
+      },
+      "last_seen": {
+        "name": "Last seen"
+      },
+      "last_seen_cloud": {
+        "name": "Last seen (Cloud)"
+      },
+      "last_seen_local": {
+        "name": "Last seen (local)"
+      },
+      "cloud_consecutive_failures": {
+        "name": "Cloud consecutive failures"
+      },
+      "cloud_success_rate": {
+        "name": "Cloud success rate"
+      },
+      "cloud_last_latency": {
+        "name": "Cloud last latency"
+      },
+      "cloud_last_success": {
+        "name": "Cloud last success"
+      },
+      "cloud_last_failure_kind": {
+        "name": "Cloud last failure kind"
       }
     },
     "binary_sensor": {
@@ -289,6 +353,27 @@
       },
       "cloud_connection": {
         "name": "Cloud connection"
+      },
+      "power": {
+        "name": "Power"
+      },
+      "power_cloud": {
+        "name": "Power (Cloud)"
+      },
+      "power_local": {
+        "name": "Power (local)"
+      },
+      "running": {
+        "name": "Running"
+      },
+      "running_cloud": {
+        "name": "Running (Cloud)"
+      },
+      "running_local": {
+        "name": "Running (local)"
+      },
+      "cloud_reachable": {
+        "name": "Cloud reachable"
       }
     },
     "select": {
@@ -346,12 +431,16 @@
     "step": {
       "init": {
         "title": "Ambientika options",
-        "description": "Choose how often the Ambientika cloud is polled. The unit reports about every 30 seconds, so shorter intervals bring nothing. After a command the integration polls every 30 seconds for three minutes, and it slows down automatically while the cloud is unreachable.",
+        "description": "Choose how often the Ambientika cloud is polled. The unit reports about every 30 seconds, so shorter intervals bring nothing. After a command the integration polls every 30 seconds for three minutes, and it slows down automatically while the cloud is unreachable. Local UDP reception adds live values from the units' broadcasts on your network.",
         "data": {
-          "scan_interval": "Polling interval"
+          "scan_interval": "Polling interval",
+          "local_udp": "Local UDP reception",
+          "raw_variants": "Create raw source variants"
         },
         "data_description": {
-          "scan_interval": "Seconds between cloud updates (30 to 600)."
+          "scan_interval": "Seconds between cloud updates (30 to 600).",
+          "local_udp": "Automatic listens for up to 60 seconds after each start and keeps listening only if your units are heard. On always listens and reports a problem if nothing arrives. Off never listens.",
+          "raw_variants": "Enable the additional Cloud and local variants of power, running and last seen. They are created disabled by default."
         }
       }
     }
@@ -440,6 +529,25 @@
     "get_schedule": {
       "name": "Get schedule",
       "description": "Return the weekly time slots of the unit, with their identifiers."
+    }
+  },
+  "selector": {
+    "local_udp": {
+      "options": {
+        "auto": "Automatic (detect)",
+        "on": "On",
+        "off": "Off"
+      }
+    }
+  },
+  "issues": {
+    "local_udp_bind_failed": {
+      "title": "Local UDP reception cannot start",
+      "description": "The integration could not open the local UDP port(s) {ports}. Another program may already use them. Local reception needs the broadcasts of the units to reach Home Assistant: Home Assistant OS and Supervised work out of the box, a Docker container needs network_mode: host, and units in another VLAN or subnet need broadcast forwarding. Set the option to Off or Automatic if you do not want local data. The cloud data keeps working."
+    },
+    "local_udp_no_frames": {
+      "title": "No local broadcasts received",
+      "description": "Local UDP reception is switched on and listens on port(s) {ports}, but no broadcast from your units arrived for several minutes. Local reception needs the broadcasts to reach Home Assistant: Home Assistant OS and Supervised work out of the box, a Docker container needs network_mode: host, and units in another VLAN or subnet need broadcast forwarding. This issue disappears by itself as soon as frames arrive. The cloud data keeps working."
     }
   }
 }

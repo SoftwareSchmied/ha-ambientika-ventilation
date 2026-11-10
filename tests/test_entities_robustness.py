@@ -41,6 +41,7 @@ from custom_components.ambientika_ventilation.fan import (
 from custom_components.ambientika_ventilation.fan import (
     async_setup_entry as setup_fans,
 )
+from custom_components.ambientika_ventilation.hub import AmbientikaHub
 from custom_components.ambientika_ventilation.models import (
     AmbientikaData,
     AmbientikaDevice,
@@ -61,6 +62,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from .hub_helpers import fake_entry, runtime
 from .test_entities import SERIAL, coordinator_with_status
 
 SENSOR = {description.key: description for description in SENSORS}
@@ -237,10 +239,7 @@ async def test_set_state_rejects_empty_unknown_and_unavailable_values() -> None:
 
 async def test_set_state_action_is_registered_with_a_schema(hass, fan_platform) -> None:
     """The fan platform registers the entity service on setup."""
-    entry = SimpleNamespace(
-        runtime_data=SimpleNamespace(coordinator=coordinator_with_status()),
-        async_on_unload=MagicMock(),
-    )
+    entry = fake_entry(coordinator_with_status())
 
     await setup_fans(hass, entry, MagicMock())
 
@@ -370,10 +369,7 @@ async def test_cloud_connection_is_created_for_configured_devices(hass) -> None:
             serial_number="SPARE0000001", name="C", role="NotConfigured"
         )
     )
-    entry = SimpleNamespace(
-        runtime_data=SimpleNamespace(coordinator=coordinator),
-        async_on_unload=MagicMock(),
-    )
+    entry = fake_entry(coordinator)
     entities: list[object] = []
 
     await setup_binary_sensors(hass, entry, entities.extend)
@@ -409,6 +405,7 @@ async def test_failed_token_renewal_is_logged_and_does_not_block_setup(
         side_effect=AmbientikaServerError(status=503)
     )
     coordinator = MagicMock()
+    coordinator.base_interval = timedelta(seconds=60)
     coordinator.async_config_entry_first_refresh = AsyncMock()
     session = MagicMock()
     session.close = AsyncMock()
@@ -445,6 +442,7 @@ async def test_successful_early_renewal_is_logged(hass, caplog) -> None:
     api = MagicMock(spec=AmbientikaApiClient)
     api.async_renew_token_if_due = AsyncMock(return_value=True)
     coordinator = MagicMock()
+    coordinator.base_interval = timedelta(seconds=60)
     coordinator.async_config_entry_first_refresh = AsyncMock()
     session = MagicMock()
     session.close = AsyncMock()
@@ -508,7 +506,7 @@ async def test_device_diagnostics_mask_the_serial_and_include_history(hass) -> N
     coordinator.offline_devices = {SERIAL}
     coordinator.firmware_history = {SERIAL: [{"micro": "1.0"}]}
     coordinator._status_errors = {SERIAL: 2}
-    entry = SimpleNamespace(runtime_data=SimpleNamespace(coordinator=coordinator))
+    entry = SimpleNamespace(runtime_data=runtime(coordinator))
     device = SimpleNamespace(identifiers={(DOMAIN, SERIAL)})
 
     result = await async_get_device_diagnostics(hass, entry, device)
@@ -555,6 +553,8 @@ async def test_config_entry_diagnostics_include_token_and_poll_history(hass) -> 
         runtime_data=SimpleNamespace(
             coordinator=coordinator,
             api=SimpleNamespace(metrics=metrics, token_expires_at="2027-02-18"),
+            hub=AmbientikaHub(),
+            local=SimpleNamespace(diagnostics=lambda: {"mode": "auto"}),
         ),
         version=1,
         minor_version=1,
@@ -594,10 +594,7 @@ async def test_platform_callbacks_ignore_devices_they_already_know(hass) -> None
     coordinator.data.devices[SERIAL] = replace(
         coordinator.data.devices[SERIAL], schedule=AmbientikaSchedule(schedule_id=3)
     )
-    entry = SimpleNamespace(
-        runtime_data=SimpleNamespace(coordinator=coordinator),
-        async_on_unload=MagicMock(),
-    )
+    entry = fake_entry(coordinator)
     for setup in (setup_selects, setup_sensors):
         entities: list[object] = []
         await setup(hass, entry, entities.extend)

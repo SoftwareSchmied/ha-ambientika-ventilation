@@ -272,6 +272,70 @@
       },
       "schedule_entries": {
         "name": "Zeitplaneinträge"
+      },
+      "direction": {
+        "name": "Physische Richtung",
+        "state": {
+          "stopped": "Steht",
+          "exhaust": "Abluft",
+          "intake": "Zuluft"
+        }
+      },
+      "physical_stage": {
+        "name": "Physische Lüfterstufe",
+        "state": {
+          "night": "Nacht",
+          "low": "Niedrig",
+          "medium": "Mittel",
+          "high": "Hoch"
+        }
+      },
+      "coupling": {
+        "name": "Zonenkopplung",
+        "state": {
+          "idle": "Ruhe",
+          "opposite": "Gegenläufig",
+          "same": "Gleichlaufend"
+        }
+      },
+      "data_source": {
+        "name": "Datenquelle",
+        "state": {
+          "local_udp": "Lokal (UDP)",
+          "cloud": "Cloud",
+          "degraded": "Eingeschränkt",
+          "offline": "Offline"
+        }
+      },
+      "heartbeat_age": {
+        "name": "Alter des lokalen Heartbeats"
+      },
+      "last_local_frame": {
+        "name": "Letzter lokaler Frame"
+      },
+      "last_seen": {
+        "name": "Zuletzt gesehen"
+      },
+      "last_seen_cloud": {
+        "name": "Zuletzt gesehen (Cloud)"
+      },
+      "last_seen_local": {
+        "name": "Zuletzt gesehen (lokal)"
+      },
+      "cloud_consecutive_failures": {
+        "name": "Aufeinanderfolgende Cloud-Fehler"
+      },
+      "cloud_success_rate": {
+        "name": "Cloud-Erfolgsquote"
+      },
+      "cloud_last_latency": {
+        "name": "Letzte Cloud-Latenz"
+      },
+      "cloud_last_success": {
+        "name": "Letzter Cloud-Erfolg"
+      },
+      "cloud_last_failure_kind": {
+        "name": "Letzte Cloud-Fehlerart"
       }
     },
     "binary_sensor": {
@@ -289,6 +353,27 @@
       },
       "cloud_connection": {
         "name": "Cloud-Verbindung"
+      },
+      "power": {
+        "name": "Eingeschaltet"
+      },
+      "power_cloud": {
+        "name": "Eingeschaltet (Cloud)"
+      },
+      "power_local": {
+        "name": "Eingeschaltet (lokal)"
+      },
+      "running": {
+        "name": "Läuft"
+      },
+      "running_cloud": {
+        "name": "Läuft (Cloud)"
+      },
+      "running_local": {
+        "name": "Läuft (lokal)"
+      },
+      "cloud_reachable": {
+        "name": "Cloud erreichbar"
       }
     },
     "select": {
@@ -346,12 +431,16 @@
     "step": {
       "init": {
         "title": "Ambientika-Optionen",
-        "description": "Lege fest, wie oft die Ambientika-Cloud abgefragt wird. Das Gerät meldet etwa alle 30 Sekunden, kürzere Abstände bringen nichts. Nach einem Befehl fragt die Integration drei Minuten lang alle 30 Sekunden ab und wird bei einer nicht erreichbaren Cloud automatisch langsamer.",
+        "description": "Lege fest, wie oft die Ambientika-Cloud abgefragt wird. Das Gerät meldet etwa alle 30 Sekunden, kürzere Abstände bringen nichts. Nach einem Befehl fragt die Integration drei Minuten lang alle 30 Sekunden ab und wird bei einer nicht erreichbaren Cloud automatisch langsamer. Der lokale UDP-Empfang ergänzt Live-Werte aus den Broadcasts der Geräte in deinem Netzwerk.",
         "data": {
-          "scan_interval": "Abfrageintervall"
+          "scan_interval": "Abfrageintervall",
+          "local_udp": "Lokaler UDP-Empfang",
+          "raw_variants": "Rohquellen-Varianten erstellen"
         },
         "data_description": {
-          "scan_interval": "Sekunden zwischen den Cloud-Abfragen (30 bis 600)."
+          "scan_interval": "Sekunden zwischen den Cloud-Abfragen (30 bis 600).",
+          "local_udp": "Automatisch lauscht nach jedem Start bis zu 60 Sekunden und lauscht nur weiter, wenn deine Geräte gehört werden. Ein lauscht immer und meldet ein Problem, wenn nichts ankommt. Aus lauscht nie.",
+          "raw_variants": "Aktiviert die zusätzlichen Cloud- und lokalen Varianten von Eingeschaltet, Läuft und Zuletzt gesehen. Sie werden standardmäßig deaktiviert angelegt."
         }
       }
     }
@@ -440,6 +529,25 @@
     "get_schedule": {
       "name": "Zeitplan abrufen",
       "description": "Gibt die wöchentlichen Zeitfenster des Geräts mit ihren Kennungen zurück."
+    }
+  },
+  "selector": {
+    "local_udp": {
+      "options": {
+        "auto": "Automatisch (erkennen)",
+        "on": "Ein",
+        "off": "Aus"
+      }
+    }
+  },
+  "issues": {
+    "local_udp_bind_failed": {
+      "title": "Lokaler UDP-Empfang kann nicht starten",
+      "description": "Die Integration konnte den lokalen UDP-Port bzw. die Ports {ports} nicht öffnen. Möglicherweise belegt ein anderes Programm sie bereits. Der lokale Empfang braucht die Broadcasts der Geräte im Netz von Home Assistant: Home Assistant OS und Supervised funktionieren direkt, ein Docker-Container braucht network_mode: host, und Geräte in einem anderen VLAN oder Subnetz brauchen Broadcast-Weiterleitung. Stelle die Option auf Aus oder Automatisch, wenn du keine lokalen Daten möchtest. Die Cloud-Daten funktionieren weiter."
+    },
+    "local_udp_no_frames": {
+      "title": "Keine lokalen Broadcasts empfangen",
+      "description": "Der lokale UDP-Empfang ist eingeschaltet und lauscht auf Port bzw. Ports {ports}, aber seit mehreren Minuten kam kein Broadcast deiner Geräte an. Der lokale Empfang braucht die Broadcasts im Netz von Home Assistant: Home Assistant OS und Supervised funktionieren direkt, ein Docker-Container braucht network_mode: host, und Geräte in einem anderen VLAN oder Subnetz brauchen Broadcast-Weiterleitung. Dieses Problem verschwindet von selbst, sobald Frames ankommen. Die Cloud-Daten funktionieren weiter."
     }
   }
 }

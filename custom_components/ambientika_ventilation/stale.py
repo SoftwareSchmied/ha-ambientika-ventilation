@@ -11,25 +11,38 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, STALE_DEVICE_DISCOVERIES, STALE_DEVICE_MIN_AGE
+from .const import (
+    CLOUD_DEVICE_PREFIX,
+    DOMAIN,
+    STALE_DEVICE_DISCOVERIES,
+    STALE_DEVICE_MIN_AGE,
+)
 
 LOGGER = logging.getLogger(__name__)
 
 
 def device_serials(device_entry: dr.DeviceEntry) -> set[str]:
-    """Return the Ambientika serial numbers of a device registry entry."""
+    """Return the Ambientika serial numbers of a device registry entry.
+
+    The account-level cloud service device has no serial number and is never
+    treated as a unit.
+    """
     return {
         identifier
         for domain, identifier in device_entry.identifiers
-        if domain == DOMAIN
+        if domain == DOMAIN and not identifier.startswith(CLOUD_DEVICE_PREFIX)
     }
 
 
 def is_removable(
     reported_serials: Collection[str], device_entry: dr.DeviceEntry
 ) -> bool:
-    """Return whether the cloud no longer reports any serial of the device."""
-    return not device_serials(device_entry) & set(reported_serials)
+    """Return whether the cloud no longer reports any serial of the device.
+
+    Devices without a unit serial (the cloud service device) are not removable.
+    """
+    serials = device_serials(device_entry)
+    return bool(serials) and not serials & set(reported_serials)
 
 
 class StaleDeviceTracker:
