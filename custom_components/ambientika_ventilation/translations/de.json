@@ -895,11 +895,11 @@
   "issues": {
     "local_udp_bind_failed": {
       "title": "Lokaler UDP-Empfang kann nicht starten",
-      "description": "Die Integration konnte den lokalen UDP-Port bzw. die Ports {ports} nicht öffnen. Möglicherweise belegt ein anderes Programm sie bereits. Der lokale Empfang braucht die Broadcasts der Geräte im Netz von Home Assistant: Home Assistant OS und Supervised funktionieren direkt, ein Docker-Container braucht network_mode: host, und Geräte in einem anderen VLAN oder Subnetz brauchen Broadcast-Weiterleitung. Stelle die Option auf Aus oder Automatisch, wenn du keine lokalen Daten möchtest. Die Cloud-Daten funktionieren weiter."
+      "description": "Die Integration konnte den lokalen UDP-Port bzw. die Ports {ports} nicht öffnen. Möglicherweise belegt ein anderes Programm sie bereits. Der lokale Empfang braucht die Broadcasts der Geräte im Netz von Home Assistant: Home Assistant OS und Supervised funktionieren direkt, ein Docker-Container braucht network_mode: host, und Geräte in einem anderen VLAN brauchen ein Interface von Home Assistant in diesem VLAN (unter Home Assistant OS: ha network vlan) oder ein Broadcast-Relay; Firewall-Regeln leiten keine Broadcasts weiter. Stelle die Option auf Aus oder Automatisch, wenn du keine lokalen Daten möchtest. Die Cloud-Daten funktionieren weiter."
     },
     "local_udp_no_frames": {
       "title": "Keine lokalen Broadcasts empfangen",
-      "description": "Der lokale UDP-Empfang ist eingeschaltet und lauscht auf Port bzw. Ports {ports}, aber seit mehreren Minuten kam kein Broadcast deiner Geräte an. Der lokale Empfang braucht die Broadcasts im Netz von Home Assistant: Home Assistant OS und Supervised funktionieren direkt, ein Docker-Container braucht network_mode: host, und Geräte in einem anderen VLAN oder Subnetz brauchen Broadcast-Weiterleitung. Dieses Problem verschwindet von selbst, sobald Frames ankommen. Die Cloud-Daten funktionieren weiter."
+      "description": "Der lokale UDP-Empfang ist eingeschaltet und lauscht auf Port bzw. Ports {ports}, aber seit mehreren Minuten kam kein Broadcast deiner Geräte an. Der lokale Empfang braucht die Broadcasts im Netz von Home Assistant: Home Assistant OS und Supervised funktionieren direkt, ein Docker-Container braucht network_mode: host, und Geräte in einem anderen VLAN brauchen ein Interface von Home Assistant in diesem VLAN (unter Home Assistant OS: ha network vlan) oder ein Broadcast-Relay; Firewall-Regeln leiten keine Broadcasts weiter. Dieses Problem verschwindet von selbst, sobald Frames ankommen. Die Cloud-Daten funktionieren weiter."
     }
   }
 }

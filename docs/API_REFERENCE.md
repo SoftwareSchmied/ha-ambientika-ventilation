@@ -160,8 +160,12 @@ lost from 300 s, never before the first frame.
 - Home Assistant OS and Supervised: works out of the box.
 - Docker: only with `network_mode: host`, because broadcasts are not routed
   into bridge networks.
-- Separate VLANs: broadcast forwarding (or a UDP broadcast relay) from the
-  device VLAN to Home Assistant is required for ports 45000 and up.
+- Separate VLANs: routers do not forward broadcasts, and firewall rules do not
+  change that. Home Assistant needs an interface in the device VLAN (on Home
+  Assistant OS `ha network vlan <interface> <id>`, static address without a
+  gateway) or a UDP broadcast relay for ports 45000 and up. Verified on a
+  Proxmox VM: a VLAN interface in HAOS receives the frames when the host's
+  switch port carries the VLAN tagged.
 - Other listeners (for example an add-on) may use the same ports in parallel;
   the sockets are opened with address and port reuse.
 

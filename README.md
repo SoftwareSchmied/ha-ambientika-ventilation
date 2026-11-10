@@ -247,9 +247,21 @@ heartbeat age) and the `... (local)` variants are not created.
 
 Network requirements: the broadcasts must reach Home Assistant. Home Assistant
 OS and Supervised work without changes. A Docker container needs
-`network_mode: host`. Units in another VLAN or subnet need broadcast
-forwarding (for example a UDP broadcast relay or a router rule). The
-integration works with the cloud alone if no broadcast arrives. Diagnostics
+`network_mode: host`. Routers never forward broadcasts, so a firewall rule
+between VLANs does not help. If the units sit in their own VLAN (for example an
+IoT network), give Home Assistant an interface in that VLAN. On Home Assistant
+OS this is one command, for example with a free address and without a gateway
+so that the default route stays unchanged:
+
+```shell
+ha network vlan <interface> <vlan id> --ipv4-method static   --ipv4-address 192.168.30.49/24 --ipv6-method disabled --mdns off --llmnr off
+```
+
+The switch port of the Home Assistant host (or its hypervisor bridge) must
+carry that VLAN tagged. Alternatively add a second virtual network card with
+the VLAN tag in the hypervisor. The integration works with the cloud alone if
+no broadcast arrives; the diagnostics show the result of the last automatic
+probe (bound ports, frames heard, rejected frames). Diagnostics
 list counters only, without house ids or addresses. See
 [docs/ENTITIES.md](docs/ENTITIES.md) for all entities.
 

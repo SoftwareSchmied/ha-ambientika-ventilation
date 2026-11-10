@@ -895,11 +895,11 @@
   "issues": {
     "local_udp_bind_failed": {
       "title": "Local UDP reception cannot start",
-      "description": "The integration could not open the local UDP port(s) {ports}. Another program may already use them. Local reception needs the broadcasts of the units to reach Home Assistant: Home Assistant OS and Supervised work out of the box, a Docker container needs network_mode: host, and units in another VLAN or subnet need broadcast forwarding. Set the option to Off or Automatic if you do not want local data. The cloud data keeps working."
+      "description": "The integration could not open the local UDP port(s) {ports}. Another program may already use them. Local reception needs the broadcasts of the units to reach Home Assistant: Home Assistant OS and Supervised work out of the box, a Docker container needs network_mode: host, and units in another VLAN need an interface of Home Assistant in that VLAN (on Home Assistant OS: ha network vlan) or a broadcast relay; firewall rules do not forward broadcasts. Set the option to Off or Automatic if you do not want local data. The cloud data keeps working."
     },
     "local_udp_no_frames": {
       "title": "No local broadcasts received",
-      "description": "Local UDP reception is switched on and listens on port(s) {ports}, but no broadcast from your units arrived for several minutes. Local reception needs the broadcasts to reach Home Assistant: Home Assistant OS and Supervised work out of the box, a Docker container needs network_mode: host, and units in another VLAN or subnet need broadcast forwarding. This issue disappears by itself as soon as frames arrive. The cloud data keeps working."
+      "description": "Local UDP reception is switched on and listens on port(s) {ports}, but no broadcast from your units arrived for several minutes. Local reception needs the broadcasts to reach Home Assistant: Home Assistant OS and Supervised work out of the box, a Docker container needs network_mode: host, and units in another VLAN need an interface of Home Assistant in that VLAN (on Home Assistant OS: ha network vlan) or a broadcast relay; firewall rules do not forward broadcasts. This issue disappears by itself as soon as frames arrive. The cloud data keeps working."
     }
   }
 }
