@@ -75,7 +75,8 @@
     "unsupported_select_option": { "message": "Die Option {option} wird nicht unterstützt." },
     "device_offline": { "message": "Das Lüftungsgerät hat nicht auf den Befehl reagiert. Prüfe in der Ambientika-App, ob es online ist." },
     "auth_failed": { "message": "Die Ambientika-Cloud hat die gespeicherten Zugangsdaten abgelehnt. Melde die Integration erneut an." },
-    "set_state_empty": { "message": "Gib mindestens einen Wert an." }
+    "set_state_empty": { "message": "Gib mindestens einen Wert an." },
+    "update_failed": { "message": "Aktualisierung aus der Ambientika-Cloud nicht möglich: {details}" }
   },
   "entity": {
     "fan": { "ventilation": { "name": "Lüftung", "state_attributes": { "preset_mode": { "state": { "night": "Nacht" } } } } },

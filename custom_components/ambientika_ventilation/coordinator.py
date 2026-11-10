@@ -13,10 +13,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
-from homeassistant.exceptions import (
-    ConfigEntryAuthFailed,
-    ServiceValidationError,
-)
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -50,7 +47,12 @@ from .const import (
     mode_allows_setting,
     operating_modes_for_device,
 )
-from .errors import action_error, validation_error
+from .errors import (
+    action_error,
+    auth_failed_error,
+    update_failed,
+    validation_error,
+)
 from .models import (
     AmbientikaData,
     AmbientikaDevice,
@@ -339,7 +341,7 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
                         self.last_failure_causes = (
                             f"discovery: {describe_error(err)}",
                         )
-                        raise UpdateFailed(f"{err} ({describe_error(err)})") from err
+                        raise update_failed(f"{err} ({describe_error(err)})") from err
                     self._discovery_failed(err)
             old_data = self.data or AmbientikaData()
             try:
@@ -351,14 +353,14 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             except TimeoutError as err:
                 self._cycle_causes.append("cycle: timeout")
                 self.last_failure_causes = tuple(self._cycle_causes)
-                raise UpdateFailed(
+                raise update_failed(
                     "The Ambientika update exceeded its time budget"
                 ) from err
         except AmbientikaAuthError as err:
-            raise ConfigEntryAuthFailed from err
+            raise auth_failed_error() from err
         except AmbientikaApiError as err:
             self.last_failure_causes = (describe_error(err),)
-            raise UpdateFailed(f"{err} ({describe_error(err)})") from err
+            raise update_failed(f"{err} ({describe_error(err)})") from err
         finally:
             self.last_update_duration_ms = round((time.monotonic() - started) * 1000)
             self.cycle_durations_ms.append(self.last_update_duration_ms)
@@ -369,7 +371,9 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             causes = "; ".join(self._cycle_causes) or "no usable status packets"
             # A unit without power is not a cloud outage: keep the normal pace.
             self._cycle_outage = not failed_devices <= self._cycle_offline
-            raise UpdateFailed(f"No Ambientika device status could be read ({causes})")
+            raise update_failed(
+                f"No Ambientika device status could be read ({causes})"
+            )
 
         # Offline devices are logged separately on their own transitions.
         newly_failed = failed_devices - self._failed_devices - self.offline_devices

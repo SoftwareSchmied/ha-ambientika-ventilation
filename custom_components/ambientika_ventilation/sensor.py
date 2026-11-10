@@ -28,6 +28,8 @@ from .coordinator import AmbientikaCoordinator
 from .entity import AmbientikaEntity
 from .models import AmbientikaDevice, AmbientikaStatus
 
+PARALLEL_UPDATES = 0
+
 ValueFn = Callable[[AmbientikaStatus], Any]
 DeviceValueFn = Callable[[AmbientikaDevice], Any]
 DeviceAttributesFn = Callable[[AmbientikaDevice], dict[str, Any]]

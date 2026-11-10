@@ -20,6 +20,8 @@ from .coordinator import AmbientikaCoordinator
 from .entity import AmbientikaEntity
 from .models import AmbientikaStatus
 
+PARALLEL_UPDATES = 0
+
 IsOnFn = Callable[[AmbientikaStatus], bool | None]
 
 

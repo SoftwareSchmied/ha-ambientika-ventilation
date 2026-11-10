@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    HomeAssistantError,
+    ServiceValidationError,
+)
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .const import DOMAIN
 
@@ -20,4 +25,21 @@ def validation_error(
         translation_domain=DOMAIN,
         translation_key=key,
         translation_placeholders=placeholders,
+    )
+
+
+def update_failed(details: str) -> UpdateFailed:
+    """Return an update failure that keeps its English text and carries a key."""
+    return UpdateFailed(
+        details,
+        translation_domain=DOMAIN,
+        translation_key="update_failed",
+        translation_placeholders={"details": details},
+    )
+
+
+def auth_failed_error() -> ConfigEntryAuthFailed:
+    """Return the translated error that starts reauthentication."""
+    return ConfigEntryAuthFailed(
+        translation_domain=DOMAIN, translation_key="auth_failed"
     )

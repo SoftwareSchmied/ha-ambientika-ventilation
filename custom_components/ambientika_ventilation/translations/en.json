@@ -75,7 +75,8 @@
     "unsupported_select_option": { "message": "Option {option} is not supported." },
     "device_offline": { "message": "The ventilation unit did not respond to the command. Check that it is online in the Ambientika app." },
     "auth_failed": { "message": "The Ambientika cloud rejected the stored credentials. Reauthenticate the integration." },
-    "set_state_empty": { "message": "Set at least one value." }
+    "set_state_empty": { "message": "Set at least one value." },
+    "update_failed": { "message": "Unable to update from the Ambientika cloud: {details}" }
   },
   "entity": {
     "fan": { "ventilation": { "name": "Ventilation", "state_attributes": { "preset_mode": { "state": { "night": "Night" } } } } },
