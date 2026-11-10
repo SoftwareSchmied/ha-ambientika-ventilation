@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-11-10
+
+- Fix commands failing while a unit reports the automatic `Night` fan speed,
+  including turning off and changing the humidity target, light sensitivity,
+  or schedule control. Reported values the cloud does not accept are replaced
+  by the unit's last writable value, falling back to `Low` for the fan speed
+  and `Normal` for the humidity target. Unknown values are never written back.
+- Report a unit that does not acknowledge a command (HTTP 406) as offline
+  instead of as a generic cloud error. Removed devices, deleted houses, houses
+  without a master, and missing schedules are now distinguished, and devices
+  are rediscovered early when a house or device disappears. A validation error
+  during login is no longer reported as invalid credentials.
+- Start reauthentication when a command fails because the cloud rejected the
+  stored credentials.
+- Name the cause of polling failures (timeout, transport error, HTTP status,
+  cloud trace ID) in the single outage log entry and in diagnostics, with
+  counters per failure kind. Serial numbers remain masked.
+- Reduce cloud load during outages. A failed discovery is retried after 5, 10,
+  and 30 minutes, up to six hours, instead of every minute. A failed house
+  status request triggers at most one individual device probe per house.
+- Add a reconfiguration flow for updating the account credentials, as already
+  referenced in the troubleshooting section.
+- The error responses were checked read-only against a live account. The
+  `Night` handling follows the official app and has not yet been observed on
+  a unit at night.
+
 ## [0.9.2] - 2026-10-20
 
 - Add read-only sensor and binary-sensor readings for configured slave devices
