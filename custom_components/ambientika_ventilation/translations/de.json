@@ -68,7 +68,8 @@
     "invalid_fan_percentage": { "message": "Der Lüfterwert muss zwischen 1 und 100 Prozent liegen." },
     "unsupported_select_option": { "message": "Die Option {option} wird nicht unterstützt." },
     "device_offline": { "message": "Das Lüftungsgerät hat nicht auf den Befehl reagiert. Prüfe in der Ambientika-App, ob es online ist." },
-    "auth_failed": { "message": "Die Ambientika-Cloud hat die gespeicherten Zugangsdaten abgelehnt. Melde die Integration erneut an." }
+    "auth_failed": { "message": "Die Ambientika-Cloud hat die gespeicherten Zugangsdaten abgelehnt. Melde die Integration erneut an." },
+    "set_state_empty": { "message": "Gib mindestens einen Wert an." }
   },
   "entity": {
     "fan": { "ventilation": { "name": "Lüftung", "state_attributes": { "preset_mode": { "state": { "night": "Nacht" } } } } },
@@ -79,7 +80,7 @@
       "air_quality": { "name": "Luftqualität", "state": { "very_good": "Sehr gut", "good": "Gut", "medium": "Mittel", "poor": "Schlecht", "bad": "Sehr schlecht" } },
       "filter_status": { "name": "Filterstatus", "state": { "good": "Gut", "medium": "Bald wechseln", "bad": "Wechseln" } },
       "packet_type": { "name": "Pakettyp" },
-      "last_operating_mode": { "name": "Letzte Betriebsart", "state": { "smart": "Smart", "auto": "Automatik", "heat_recovery": "Wärmerückgewinnung", "night": "Nacht", "away": "Abwesend", "surveillance": "Überwachung", "timed_extraction": "Zeitgesteuerte Abluft", "extraction": "Abluft", "intake": "Zuluft", "master_slave_flow": "Master-zu-Slave-Luftstrom", "slave_master_flow": "Slave-zu-Master-Luftstrom", "off": "Aus" } },
+      "last_operating_mode": { "name": "Letzte Betriebsart", "state": { "smart": "Smart", "auto": "Automatik", "heat_recovery": "Wärmerückgewinnung", "night": "Nacht", "away": "Abwesend", "surveillance": "Überwachung", "timed_extraction": "Zeitgesteuerte Abluft", "extraction": "Abluft", "intake": "Zuluft", "master_slave_flow": "Master-zu-Slave-Luftstrom", "slave_master_flow": "Slave-zu-Master-Luftstrom", "off": "Aus", "turbo": "Turbo (alt)" } },
       "device_type": { "name": "Gerätetyp" },
       "device_subtype": { "name": "Geräteuntertyp" },
       "device_role": { "name": "Geräterolle", "state": { "master": "Master", "slave_equal_master": "Slave synchron", "slave_opposite_master": "Slave alternierend", "not_configured": "Nicht konfiguriert" } },
@@ -101,7 +102,8 @@
       "humidity_alarm": { "name": "Feuchtealarm" },
       "filter_problem": { "name": "Filter prüfen" },
       "night": { "name": "Nacht erkannt" },
-      "schedule": { "name": "Zeitplan" }
+      "schedule": { "name": "Zeitplan" },
+      "cloud_connection": { "name": "Cloud-Verbindung" }
     },
     "select": {
       "operating_mode": { "name": "Betriebsart", "state": { "smart": "Smart", "auto": "Automatik", "heat_recovery": "Wärmerückgewinnung", "night": "Nacht", "away": "Abwesend", "surveillance": "Überwachung", "timed_extraction": "Zeitgesteuerte Abluft", "extraction": "Abluft", "intake": "Zuluft", "master_slave_flow": "Master-zu-Slave-Luftstrom", "slave_master_flow": "Slave-zu-Master-Luftstrom", "off": "Aus" } },
@@ -110,5 +112,7 @@
     },
     "switch": { "schedule": { "name": "Zeitplansteuerung" } },
     "button": { "reset_filter": { "name": "Filterstatus zurücksetzen" } }
-  }
+  },
+  "options": {"step": {"init": {"title": "Ambientika-Optionen", "description": "Lege fest, wie oft die Ambientika-Cloud abgefragt wird. Das Gerät meldet etwa alle 30 Sekunden, kürzere Abstände bringen nichts. Nach einem Befehl fragt die Integration drei Minuten lang alle 30 Sekunden ab und wird bei einer nicht erreichbaren Cloud automatisch langsamer.", "data": {"scan_interval": "Abfrageintervall"}, "data_description": {"scan_interval": "Sekunden zwischen den Cloud-Abfragen (30 bis 600)."}}}},
+  "services": {"set_state": {"name": "Zustand setzen", "description": "Setzt Betriebsart, Lüfterstufe, Feuchteziel und Lichtsensor-Empfindlichkeit in einem Befehl. Nur die angegebenen Werte ändern sich.", "fields": {"operating_mode": {"name": "Betriebsart", "description": "Neue Betriebsart."}, "fan_speed": {"name": "Lüfterstufe", "description": "Neue Lüfterstufe; nur in Betriebsarten mit wählbarer Stufe."}, "humidity_level": {"name": "Feuchteziel", "description": "Neues Feuchteziel; nur in den Betriebsarten Automatik und Überwachung."}, "light_sensor_level": {"name": "Lichtsensor-Empfindlichkeit", "description": "Neue Lichtsensor-Empfindlichkeit; nur in den Betriebsarten Smart und Automatik."}}}}
 }

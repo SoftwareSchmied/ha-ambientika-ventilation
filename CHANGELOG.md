@@ -6,6 +6,53 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+- Merge commands for one unit that arrive together (for example mode and
+  humidity target in a scene) into a single cloud request, based on the last
+  known state plus commands not yet confirmed. Add the action
+  `ambientika_ventilation.set_state` to set mode, fan speed, humidity target and
+  light sensitivity atomically. The written values appear at once instead of
+  after the read-back.
+- A poll that started before or shortly after a command no longer overwrites the
+  commanded values with the old state the cloud still returns.
+- Turbo is only offered when the server feature flag `turboMode` is not switched
+  off (a missing flag counts as on). Status fields are read regardless of
+  capitalization (for example `IsTurboAvailable`). The legacy Turbo operating
+  mode is shown read-only; unknown enum values show as unknown with a
+  `raw_value` attribute instead of failing.
+- A unit whose status request is rejected with HTTP 403 or 404 is retried after
+  1, 2, 5 and 15 minutes and only treated as unsupported after four consecutive
+  rejections. New binary sensor "Cloud connection" per unit, which stays
+  available while the unit is offline.
+- An empty discovery answer no longer removes all known devices; it is handled
+  like any other discovery failure (previous list kept, retry with backoff).
+- Poll requests make a single attempt (the next poll is the retry). While the
+  cloud is unreachable the poll interval grows up to ten minutes. Requests time
+  out after 10 s (5 s to connect), a status update has a time budget below the
+  interval, and commands have their own request lane so a hanging poll cannot
+  block them.
+- Renew the login token when fewer than 30 days remain (checked daily), and do
+  not log in again when another request already renewed the token.
+- Use a dedicated connection pool with 120 s keep-alive instead of Home
+  Assistant's shared session, which closes idle connections after 15 s. This
+  avoids a TLS handshake on every poll.
+- Add an options flow for the poll interval (30 to 600 s, default 60 s). After a
+  command the cloud is polled every 30 s for three minutes.
+- Update entities only when a poll brings changed data. Platforms look for new
+  entities only when the set of devices or their capabilities changes.
+- Read names, roles and firmware versions from every house status response:
+  update the device registry, fire `ambientika_ventilation_device_changed`,
+  start an early discovery for unknown devices, and keep a firmware history in
+  diagnostics.
+- Request weekly schedules only for units that report a schedule and as soon as
+  one starts reporting it, instead of probing every device every six hours.
+- Signal strength 0 from firmware without a signal field is shown as unknown.
+  The operating mode options are computed from the current device data.
+- Extend diagnostics: recent poll durations, interval and failure streak, token
+  expiry, request structure per endpoint, queue wait, discarded polls, and
+  per-device diagnostics.
+- Authentication errors while reading optional house metadata or feature flags
+  are no longer swallowed.
+
 ## [0.9.3] - 2026-11-10
 
 - Fix commands failing while a unit reports the automatic `Night` fan speed,

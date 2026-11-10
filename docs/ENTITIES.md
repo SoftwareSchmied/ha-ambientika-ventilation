@@ -30,6 +30,7 @@ still be reset.
 | Binary sensor | `filter_problem` | Filter needs attention |
 | Binary sensor | `night` | Night detected by the unit |
 | Binary sensor | `schedule` | Weekly schedule is active |
+| Binary sensor | `cloud_connection` | The cloud has current status data for the unit (diagnostic; available while the unit is offline) |
 
 ## Diagnostic entities
 

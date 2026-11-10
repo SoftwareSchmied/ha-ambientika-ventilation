@@ -120,6 +120,7 @@ marked as not configured during discovery retain only their static diagnostics.
 | Binary sensor | Filter attention | Enabled |
 | Binary sensor | Night detected | Enabled |
 | Binary sensor | Schedule active | Enabled |
+| Binary sensor | Cloud connection (diagnostic, stays available while a unit is offline) | Enabled |
 | Switch | Schedule control | Enabled when supported |
 | Button | Reset filter status | Available when replacement is due |
 | Sensor | Signal strength | Disabled |
@@ -142,27 +143,59 @@ non-Gemini units, while Gemini units also omit Away mode.
 
 ## Reliability and cloud usage
 
-Device status is refreshed every 60 seconds, preferably through one aggregate
-request per house. Missing packets automatically fall back to per-device
-requests. Discovery metadata, weekly schedules, and server features are
-refreshed every six hours. Requests are limited to three in parallel. HTTP 429
-and temporary server errors use bounded exponential backoff with jitter. A
-failure of one optional resource or device retains its last good data and does
-not block other devices. Affected entities are marked unavailable until their
-next successful update.
+Device status is refreshed every 60 seconds by default, preferably through one
+aggregate request per house. The interval can be changed under **Configure**
+(30 to 600 seconds; the unit itself reports only about every 30 seconds). After
+a command the integration polls every 30 seconds for three minutes. While the
+cloud is unreachable it slows down step by step to at most ten minutes, and it
+returns to the normal pace with the first successful poll. Missing packets
+automatically fall back to per-device requests. Discovery metadata and server
+features are refreshed every six hours; names, roles, and firmware versions are
+also read from every status response, so a firmware update or rename shows up
+within one poll (the device registry is updated and an
+`ambientika_ventilation_device_changed` event is fired). Weekly schedules are
+requested only for units that report a schedule, and as soon as one starts
+reporting it. Poll requests make a single attempt, because the next poll is the
+retry; commands and discovery retry with bounded exponential backoff and
+jitter. Requests are limited to three in parallel, with a separate lane for
+commands. Each request times out after 10 seconds. A failure of one optional
+resource or device retains its last good data and does not block other devices.
+Affected entities are marked unavailable until their next successful update. An
+empty discovery answer for an account that had devices is treated as a cloud
+error and the known devices are kept. The integration uses its own connection
+pool that keeps connections open for two minutes, which avoids a new TLS
+handshake with every poll, and it renews the login token 30 days before it
+expires.
 
 For each configured slave missing from the house batch, polling adds one
-individual status request per 60-second cycle, before any bounded retries.
-Endpoints returning HTTP 403 or 404 are skipped until the next successful
-discovery (normally every six hours), unless a usable house-batch packet arrives
-earlier. Empty status packets and packets identifying another device are not
-used as that device's readings. The API supplies no measurement timestamp, so
-a successful cloud read cannot establish when the unit last measured a value.
+individual status request per cycle. A unit whose status request is rejected
+with HTTP 403 or 404 is asked again after 1, 2, 5, and 15 minutes and is only
+skipped until the next discovery (normally every six hours) after four
+consecutive rejections, so a short outage does not disable it. Empty status
+packets and packets identifying another device are not used as that device's
+readings. The API supplies no measurement timestamp, so a successful cloud read
+cannot establish when the unit last measured a value. Entities update only when
+a poll brings new data.
+
+Turbo is offered only when the unit reports it as available and the server does
+not switch the `turboMode` feature off (a missing flag counts as on). Field names
+are read regardless of capitalization. The legacy Turbo operating mode is shown
+read-only in the "Last operating mode" sensor. Unknown enum values show as
+unknown and keep the raw text in the `raw_value` attribute.
 
 Controls send only values documented as writable by the current API and
 confirmed by the official Android app. Every write sends a complete, validated
-state and immediately reads the device state back so that cloud-side rounding
-or rejection is visible in Home Assistant.
+state. Commands for the same unit that arrive within about 0.4 seconds are
+merged into one request and are based on the last known state plus commands not
+yet confirmed, so a scene that sets mode and humidity no longer overwrites
+itself. The written values are shown at once and read back after 3 seconds (a
+second time after another 3 seconds), because the cloud needs about 0.2 to 3
+seconds to reflect a command. A poll that was started before or right after a
+command never overwrites the commanded values.
+
+The action `ambientika_ventilation.set_state` sets operating mode, fan speed,
+humidity target, and light sensor sensitivity of one or more units in a single
+command; only the given values change and the usual mode rules apply.
 
 ## Migrating from the former integration
 
@@ -183,7 +216,10 @@ integration. Existing automations must be updated to reference the new entities.
 Download diagnostics from **Settings → Devices & services → Ambientika
 Ventilation → ⋮ → Download diagnostics**. Diagnostics include integration and
 entry versions, detected capabilities, request/status counters, update
-duration, and active conditions. Passwords, JWTs, email addresses, room/house
+duration and its recent history, failure causes, token expiry date, request
+metrics including the structure (keys and types, never values) of the last
+response per endpoint, a firmware history, and active conditions; per-device
+diagnostics are available too. Passwords, JWTs, email addresses, room/house
 names, full serial numbers, exact API payloads, and callback URLs are excluded.
 
 ## Troubleshooting

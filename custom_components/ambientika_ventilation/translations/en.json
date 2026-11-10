@@ -68,7 +68,8 @@
     "invalid_fan_percentage": { "message": "Fan percentage must be between 1 and 100." },
     "unsupported_select_option": { "message": "Option {option} is not supported." },
     "device_offline": { "message": "The ventilation unit did not respond to the command. Check that it is online in the Ambientika app." },
-    "auth_failed": { "message": "The Ambientika cloud rejected the stored credentials. Reauthenticate the integration." }
+    "auth_failed": { "message": "The Ambientika cloud rejected the stored credentials. Reauthenticate the integration." },
+    "set_state_empty": { "message": "Set at least one value." }
   },
   "entity": {
     "fan": { "ventilation": { "name": "Ventilation", "state_attributes": { "preset_mode": { "state": { "night": "Night" } } } } },
@@ -79,7 +80,7 @@
       "air_quality": { "name": "Air quality", "state": { "very_good": "Very good", "good": "Good", "medium": "Medium", "poor": "Poor", "bad": "Bad" } },
       "filter_status": { "name": "Filter status", "state": { "good": "Good", "medium": "Replace soon", "bad": "Replace" } },
       "packet_type": { "name": "Packet type" },
-      "last_operating_mode": { "name": "Last operating mode", "state": { "smart": "Smart", "auto": "Automatic", "heat_recovery": "Heat recovery", "night": "Night", "away": "Away", "surveillance": "Surveillance", "timed_extraction": "Timed extraction", "extraction": "Extraction", "intake": "Intake", "master_slave_flow": "Master to slave flow", "slave_master_flow": "Slave to master flow", "off": "Off" } },
+      "last_operating_mode": { "name": "Last operating mode", "state": { "smart": "Smart", "auto": "Automatic", "heat_recovery": "Heat recovery", "night": "Night", "away": "Away", "surveillance": "Surveillance", "timed_extraction": "Timed extraction", "extraction": "Extraction", "intake": "Intake", "master_slave_flow": "Master to slave flow", "slave_master_flow": "Slave to master flow", "off": "Off", "turbo": "Turbo (legacy)" } },
       "device_type": { "name": "Device type" },
       "device_subtype": { "name": "Device subtype" },
       "device_role": { "name": "Device role", "state": { "master": "Master", "slave_equal_master": "Slave synchronized", "slave_opposite_master": "Slave alternating", "not_configured": "Not configured" } },
@@ -101,7 +102,8 @@
       "humidity_alarm": { "name": "Humidity alarm" },
       "filter_problem": { "name": "Filter attention" },
       "night": { "name": "Night detected" },
-      "schedule": { "name": "Schedule" }
+      "schedule": { "name": "Schedule" },
+      "cloud_connection": { "name": "Cloud connection" }
     },
     "select": {
       "operating_mode": { "name": "Operating mode", "state": { "smart": "Smart", "auto": "Automatic", "heat_recovery": "Heat recovery", "night": "Night", "away": "Away", "surveillance": "Surveillance", "timed_extraction": "Timed extraction", "extraction": "Extraction", "intake": "Intake", "master_slave_flow": "Master to slave flow", "slave_master_flow": "Slave to master flow", "off": "Off" } },
@@ -110,5 +112,7 @@
     },
     "switch": { "schedule": { "name": "Schedule control" } },
     "button": { "reset_filter": { "name": "Reset filter status" } }
-  }
+  },
+  "options": {"step": {"init": {"title": "Ambientika options", "description": "Choose how often the Ambientika cloud is polled. The unit reports about every 30 seconds, so shorter intervals bring nothing. After a command the integration polls every 30 seconds for three minutes, and it slows down automatically while the cloud is unreachable.", "data": {"scan_interval": "Polling interval"}, "data_description": {"scan_interval": "Seconds between cloud updates (30 to 600)."}}}},
+  "services": {"set_state": {"name": "Set state", "description": "Set the operating mode, fan speed, humidity target and light sensor sensitivity in one command. Only the given values change.", "fields": {"operating_mode": {"name": "Operating mode", "description": "New operating mode."}, "fan_speed": {"name": "Fan speed", "description": "New fan speed; only for modes with a selectable speed."}, "humidity_level": {"name": "Humidity target", "description": "New humidity target; only in Automatic and Surveillance mode."}, "light_sensor_level": {"name": "Light sensor sensitivity", "description": "New light sensor sensitivity; only in Smart and Automatic mode."}}}}
 }
