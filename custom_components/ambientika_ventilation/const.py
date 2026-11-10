@@ -12,6 +12,10 @@ INTEGRATION_VERSION: Final = "1.0.0-beta.1"
 DEFAULT_BASE_URL: Final = "https://app.ambientika.eu:4521"
 DEFAULT_SCAN_INTERVAL: Final = timedelta(seconds=60)
 DISCOVERY_INTERVAL: Final = timedelta(hours=6)
+# Devices missing from this many consecutive successful discoveries (every six
+# hours) and for at least the minimum age are removed from the registry.
+STALE_DEVICE_DISCOVERIES: Final = 4
+STALE_DEVICE_MIN_AGE: Final = timedelta(hours=24)
 REQUEST_TIMEOUT: Final = 10
 CONNECT_TIMEOUT: Final = 5
 # Idle connections are kept slightly shorter than the cloud's ~130 s so that

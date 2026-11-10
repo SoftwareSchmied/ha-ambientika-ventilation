@@ -35,6 +35,7 @@ from .const import (
     TOKEN_RENEW_BEFORE,
 )
 from .coordinator import AmbientikaCoordinator
+from .stale import is_removable
 
 LOGGER = logging.getLogger(__name__)
 
@@ -144,8 +145,4 @@ async def async_remove_config_entry_device(
     device_entry: dr.DeviceEntry,
 ) -> bool:
     """Allow removal only after a device disappeared from the cloud account."""
-    known_devices = entry.runtime_data.coordinator.data.devices
-    return not any(
-        domain == DOMAIN and identifier in known_devices
-        for domain, identifier in device_entry.identifiers
-    )
+    return is_removable(entry.runtime_data.coordinator.data.devices, device_entry)

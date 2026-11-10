@@ -65,6 +65,7 @@ from .models import (
     parse_schedule,
     parse_status,
 )
+from .stale import StaleDeviceTracker
 
 LOGGER = logging.getLogger(__name__)
 
@@ -210,6 +211,7 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
         self.discovery_failures = 0
         self.next_discovery_attempt: datetime | None = None
         self._rediscovery_requested = False
+        self.stale_devices = StaleDeviceTracker(hass, entry)
         self.last_successful_update: datetime | None = None
         self.last_update_duration_ms: int | None = None
         self.cycle_durations_ms: deque[int] = deque(maxlen=MAX_CYCLE_HISTORY)
@@ -550,6 +552,7 @@ class AmbientikaCoordinator(DataUpdateCoordinator[AmbientikaData]):
             LOGGER.info("Ambientika device discovery recovered")
         self.discovery_failures = 0
         self.next_discovery_attempt = None
+        self.stale_devices.async_discovered(devices)
         feature_flags: dict[str, bool] = {}
         try:
             feature_flags = await self.api.async_feature_flags()
