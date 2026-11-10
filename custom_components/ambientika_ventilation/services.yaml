@@ -45,8 +45,6 @@ set_state:
 
 set_time_slot:
   target:
-    device:
-      integration: ambientika_ventilation
     entity:
       integration: ambientika_ventilation
       domain: calendar
@@ -114,8 +112,6 @@ set_time_slot:
 
 delete_time_slot:
   target:
-    device:
-      integration: ambientika_ventilation
     entity:
       integration: ambientika_ventilation
       domain: calendar
@@ -129,8 +125,6 @@ delete_time_slot:
 
 clear_schedule:
   target:
-    device:
-      integration: ambientika_ventilation
     entity:
       integration: ambientika_ventilation
       domain: calendar
@@ -143,8 +137,6 @@ clear_schedule:
 
 get_schedule:
   target:
-    device:
-      integration: ambientika_ventilation
     entity:
       integration: ambientika_ventilation
       domain: calendar

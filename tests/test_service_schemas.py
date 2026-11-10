@@ -35,3 +35,21 @@ async def test_entity_services_register_field_dicts(module, setup_kwargs) -> Non
             continue
         assert isinstance(schema, dict)
         assert cv.is_entity_service_schema(cv.make_entity_service_schema(schema))
+
+
+def test_service_targets_use_no_device_filter() -> None:
+    """hassfest rejects device filters on service targets."""
+    from pathlib import Path
+
+    import yaml
+
+    services = yaml.safe_load(
+        (
+            Path(__file__).parents[1]
+            / "custom_components"
+            / "ambientika_ventilation"
+            / "services.yaml"
+        ).read_text(encoding="utf-8")
+    )
+    for name, service in services.items():
+        assert "device" not in (service.get("target") or {}), name
