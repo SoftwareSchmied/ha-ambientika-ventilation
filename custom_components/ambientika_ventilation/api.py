@@ -223,7 +223,7 @@ class AmbientikaApiClient:
         session: ClientSession,
         base_url: str,
         username: str,
-        password: str,
+        password: str | None,
         *,
         token: str | None = None,
         user_id: int | None = None,
@@ -256,7 +256,13 @@ class AmbientikaApiClient:
         return self._expires_at
 
     async def async_authenticate(self) -> AmbientikaToken:
-        """Authenticate with user credentials and retain the returned JWT."""
+        """Authenticate with user credentials and retain the returned JWT.
+
+        Without a stored password (token-only mode) a rejected token cannot be
+        replaced; the caller then has to start reauthentication.
+        """
+        if self._password is None:
+            raise AmbientikaAuthError("No password is stored for this account")
         payload = await self._request(
             "POST",
             "/Users/authenticate",

@@ -7,11 +7,13 @@
         "description": "Enter the credentials used by the Ambientika app.",
         "data": {
           "username": "Email address",
-          "password": "Password"
+          "password": "Password",
+          "token_only": "Do not store the password"
         },
         "data_description": {
           "username": "Email address registered in the Ambientika app.",
-          "password": "Password for the Ambientika cloud account."
+          "password": "Password for the Ambientika cloud account.",
+          "token_only": "Store only the renewable access token. The password stays out of the Home Assistant storage; if the token cannot be renewed in time, you will be asked to sign in again. Home Assistant must run at least once every few months."
         }
       },
       "reauth_confirm": {
@@ -19,11 +21,13 @@
         "description": "Enter valid Ambientika credentials to restore access.",
         "data": {
           "username": "Email address",
-          "password": "Password"
+          "password": "Password",
+          "token_only": "Do not store the password"
         },
         "data_description": {
           "username": "Email address registered in the Ambientika app.",
-          "password": "Current password for the Ambientika cloud account."
+          "password": "Current password for the Ambientika cloud account.",
+          "token_only": "Store only the renewable access token. The password stays out of the Home Assistant storage; if the token cannot be renewed in time, you will be asked to sign in again. Home Assistant must run at least once every few months."
         }
       },
       "reconfigure": {
@@ -31,11 +35,13 @@
         "description": "Enter the current credentials of the same Ambientika account.",
         "data": {
           "username": "Email address",
-          "password": "Password"
+          "password": "Password",
+          "token_only": "Do not store the password"
         },
         "data_description": {
           "username": "Email address registered in the Ambientika app.",
-          "password": "Current password for the Ambientika cloud account."
+          "password": "Current password for the Ambientika cloud account.",
+          "token_only": "Store only the renewable access token. The password stays out of the Home Assistant storage; if the token cannot be renewed in time, you will be asked to sign in again. Home Assistant must run at least once every few months."
         }
       }
     },
@@ -69,7 +75,8 @@
     "unsupported_select_option": { "message": "Option {option} is not supported." },
     "device_offline": { "message": "The ventilation unit did not respond to the command. Check that it is online in the Ambientika app." },
     "auth_failed": { "message": "The Ambientika cloud rejected the stored credentials. Reauthenticate the integration." },
-    "set_state_empty": { "message": "Set at least one value." }
+    "set_state_empty": { "message": "Set at least one value." },
+    "update_failed": { "message": "Unable to update from the Ambientika cloud: {details}" }
   },
   "entity": {
     "fan": { "ventilation": { "name": "Ventilation", "state_attributes": { "preset_mode": { "state": { "night": "Night" } } } } },

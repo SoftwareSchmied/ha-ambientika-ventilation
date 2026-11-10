@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Literal, TypedDict
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.config_entries import ConfigEntry
@@ -25,8 +26,17 @@ from .models import AmbientikaStatus, is_controllable_device
 
 PARALLEL_UPDATES = 1
 
+WriteField = Literal["operating_mode", "humidity_level", "light_sensor_level"]
 ValueFn = Callable[[AmbientikaStatus], str | None]
 SupportedFn = Callable[[AmbientikaStatus | None], bool]
+
+
+class _SelectFields(TypedDict, total=False):
+    """Keyword arguments of a coordinator write issued by a select."""
+
+    operating_mode: str
+    humidity_level: str
+    light_sensor_level: str
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -35,7 +45,7 @@ class AmbientikaSelectDescription(SelectEntityDescription):
 
     api_options: tuple[str, ...]
     value_fn: ValueFn
-    write_field: str
+    write_field: WriteField
     supported_fn: SupportedFn = lambda status: True
 
 
@@ -145,9 +155,6 @@ class AmbientikaSelect(AmbientikaEntity, SelectEntity):
                 "unsupported_select_option",
                 placeholders={"option": option},
             )
-        await self.coordinator.async_write_state(
-            self._serial,
-            **{  # type: ignore[arg-type]
-                self.entity_description.write_field: api_by_option[option]
-            },
-        )
+        fields: _SelectFields = {}
+        fields[self.entity_description.write_field] = api_by_option[option]
+        await self.coordinator.async_write_state(self._serial, **fields)

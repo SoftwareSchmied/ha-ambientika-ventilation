@@ -7,11 +7,13 @@
         "description": "Gib die Zugangsdaten der Ambientika-App ein.",
         "data": {
           "username": "E-Mail-Adresse",
-          "password": "Passwort"
+          "password": "Passwort",
+          "token_only": "Passwort nicht speichern"
         },
         "data_description": {
           "username": "E-Mail-Adresse, die in der Ambientika-App registriert ist.",
-          "password": "Passwort des Ambientika-Cloud-Kontos."
+          "password": "Passwort des Ambientika-Cloud-Kontos.",
+          "token_only": "Speichert nur das erneuerbare Zugriffstoken. Das Passwort liegt nicht im Home-Assistant-Speicher; kann das Token nicht rechtzeitig erneuert werden, wirst du zur erneuten Anmeldung aufgefordert. Home Assistant muss dafür mindestens alle paar Monate laufen."
         }
       },
       "reauth_confirm": {
@@ -19,11 +21,13 @@
         "description": "Gib gültige Ambientika-Zugangsdaten ein, um den Zugriff wiederherzustellen.",
         "data": {
           "username": "E-Mail-Adresse",
-          "password": "Passwort"
+          "password": "Passwort",
+          "token_only": "Passwort nicht speichern"
         },
         "data_description": {
           "username": "E-Mail-Adresse, die in der Ambientika-App registriert ist.",
-          "password": "Aktuelles Passwort des Ambientika-Cloud-Kontos."
+          "password": "Aktuelles Passwort des Ambientika-Cloud-Kontos.",
+          "token_only": "Speichert nur das erneuerbare Zugriffstoken. Das Passwort liegt nicht im Home-Assistant-Speicher; kann das Token nicht rechtzeitig erneuert werden, wirst du zur erneuten Anmeldung aufgefordert. Home Assistant muss dafür mindestens alle paar Monate laufen."
         }
       },
       "reconfigure": {
@@ -31,11 +35,13 @@
         "description": "Gib die aktuellen Zugangsdaten desselben Ambientika-Kontos ein.",
         "data": {
           "username": "E-Mail-Adresse",
-          "password": "Passwort"
+          "password": "Passwort",
+          "token_only": "Passwort nicht speichern"
         },
         "data_description": {
           "username": "E-Mail-Adresse, die in der Ambientika-App registriert ist.",
-          "password": "Aktuelles Passwort des Ambientika-Cloud-Kontos."
+          "password": "Aktuelles Passwort des Ambientika-Cloud-Kontos.",
+          "token_only": "Speichert nur das erneuerbare Zugriffstoken. Das Passwort liegt nicht im Home-Assistant-Speicher; kann das Token nicht rechtzeitig erneuert werden, wirst du zur erneuten Anmeldung aufgefordert. Home Assistant muss dafür mindestens alle paar Monate laufen."
         }
       }
     },
@@ -69,7 +75,8 @@
     "unsupported_select_option": { "message": "Die Option {option} wird nicht unterstützt." },
     "device_offline": { "message": "Das Lüftungsgerät hat nicht auf den Befehl reagiert. Prüfe in der Ambientika-App, ob es online ist." },
     "auth_failed": { "message": "Die Ambientika-Cloud hat die gespeicherten Zugangsdaten abgelehnt. Melde die Integration erneut an." },
-    "set_state_empty": { "message": "Gib mindestens einen Wert an." }
+    "set_state_empty": { "message": "Gib mindestens einen Wert an." },
+    "update_failed": { "message": "Aktualisierung aus der Ambientika-Cloud nicht möglich: {details}" }
   },
   "entity": {
     "fan": { "ventilation": { "name": "Lüftung", "state_attributes": { "preset_mode": { "state": { "night": "Nacht" } } } } },

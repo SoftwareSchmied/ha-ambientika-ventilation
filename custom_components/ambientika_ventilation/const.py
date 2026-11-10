@@ -8,10 +8,14 @@ from typing import Final
 from homeassistant.const import Platform
 
 DOMAIN: Final = "ambientika_ventilation"
-INTEGRATION_VERSION: Final = "0.9.3"
+INTEGRATION_VERSION: Final = "1.0.0-beta.1"
 DEFAULT_BASE_URL: Final = "https://app.ambientika.eu:4521"
 DEFAULT_SCAN_INTERVAL: Final = timedelta(seconds=60)
 DISCOVERY_INTERVAL: Final = timedelta(hours=6)
+# Devices missing from this many consecutive successful discoveries (every six
+# hours) and for at least the minimum age are removed from the registry.
+STALE_DEVICE_DISCOVERIES: Final = 4
+STALE_DEVICE_MIN_AGE: Final = timedelta(hours=24)
 REQUEST_TIMEOUT: Final = 10
 CONNECT_TIMEOUT: Final = 5
 # Idle connections are kept slightly shorter than the cloud's ~130 s so that
@@ -35,6 +39,7 @@ EVENT_DEVICE_CHANGED: Final = f"{DOMAIN}_device_changed"
 CONF_BASE_URL: Final = "base_url"
 CONF_EXPIRES_AT: Final = "expires_at"
 CONF_TOKEN: Final = "token"
+CONF_TOKEN_ONLY: Final = "token_only"
 CONF_USER_ID: Final = "user_id"
 
 PLATFORMS: Final = (

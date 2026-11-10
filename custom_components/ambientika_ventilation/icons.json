@@ -1,0 +1,74 @@
+{
+  "entity": {
+    "sensor": {
+      "signal_strength": { "default": "mdi:signal" },
+      "air_quality": {
+        "default": "mdi:air-filter",
+        "state": {
+          "very_good": "mdi:emoticon-excited-outline",
+          "good": "mdi:emoticon-happy-outline",
+          "medium": "mdi:emoticon-neutral-outline",
+          "poor": "mdi:emoticon-sad-outline",
+          "bad": "mdi:emoticon-dead-outline"
+        }
+      },
+      "filter_status": {
+        "default": "mdi:air-filter",
+        "state": {
+          "good": "mdi:air-filter",
+          "medium": "mdi:air-filter",
+          "bad": "mdi:air-filter-alert"
+        }
+      },
+      "packet_type": { "default": "mdi:package-variant-closed" },
+      "last_operating_mode": { "default": "mdi:fan-clock" },
+      "device_type": { "default": "mdi:hvac" },
+      "device_subtype": { "default": "mdi:hvac" },
+      "device_role": { "default": "mdi:swap-horizontal-circle-outline" },
+      "micro_firmware": { "default": "mdi:chip" },
+      "radio_firmware": { "default": "mdi:chip" },
+      "radio_at_firmware": { "default": "mdi:chip" },
+      "house": { "default": "mdi:home-outline" },
+      "zone": { "default": "mdi:vector-square" },
+      "room": { "default": "mdi:door" },
+      "device_id": { "default": "mdi:identifier" },
+      "house_id": { "default": "mdi:identifier" },
+      "room_id": { "default": "mdi:identifier" },
+      "zone_id": { "default": "mdi:identifier" },
+      "zone_index": { "default": "mdi:numeric" },
+      "schedule_entries": { "default": "mdi:calendar-clock" }
+    },
+    "binary_sensor": {
+      "humidity_alarm": {
+        "default": "mdi:water-check",
+        "state": { "on": "mdi:water-alert" }
+      },
+      "filter_problem": {
+        "default": "mdi:air-filter",
+        "state": { "on": "mdi:air-filter-alert" }
+      },
+      "night": {
+        "default": "mdi:weather-sunny",
+        "state": { "on": "mdi:weather-night" }
+      },
+      "schedule": {
+        "default": "mdi:calendar-blank",
+        "state": { "on": "mdi:calendar-clock" }
+      }
+    },
+    "select": {
+      "operating_mode": { "default": "mdi:fan-auto" },
+      "humidity_level": { "default": "mdi:water-percent" },
+      "light_sensor_level": { "default": "mdi:brightness-6" }
+    },
+    "switch": {
+      "schedule": {
+        "default": "mdi:calendar-blank",
+        "state": { "on": "mdi:calendar-clock" }
+      }
+    },
+    "button": {
+      "reset_filter": { "default": "mdi:air-filter" }
+    }
+  }
+}

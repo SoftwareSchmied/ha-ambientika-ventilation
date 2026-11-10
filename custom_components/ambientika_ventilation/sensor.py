@@ -28,6 +28,8 @@ from .coordinator import AmbientikaCoordinator
 from .entity import AmbientikaEntity
 from .models import AmbientikaDevice, AmbientikaStatus
 
+PARALLEL_UPDATES = 0
+
 ValueFn = Callable[[AmbientikaStatus], Any]
 DeviceValueFn = Callable[[AmbientikaDevice], Any]
 DeviceAttributesFn = Callable[[AmbientikaDevice], dict[str, Any]]
@@ -173,13 +175,8 @@ DEVICE_SENSORS = (
         value_fn=lambda device: device.house_name,
         attributes_fn=lambda device: _without_none(
             {
-                "house_id": device.house_id,
-                "address": device.house_address,
-                "latitude": device.house_latitude,
-                "longitude": device.house_longitude,
                 "timezone": device.house_timezone,
                 "iana_timezone": device.house_iana_timezone,
-                "current_house_time": device.house_current_time,
                 "zones_count": device.house_zones_count,
                 "devices_count": device.house_devices_count,
             }
@@ -407,7 +404,6 @@ class AmbientikaScheduleSensor(AmbientikaEntity, SensorEntity):
         return {
             "schedule_id": schedule.schedule_id,
             "zone_id": schedule.zone_id,
-            "house_id": schedule.house_id,
             "device_id": schedule.device_id,
             "time_slots": [
                 {

@@ -222,7 +222,10 @@ def test_device_metadata_sensor_normalizes_role() -> None:
 
 
 def test_house_sensor_exposes_complete_topology_metadata() -> None:
-    """House details are grouped as disabled diagnostic attributes."""
+    """House details are grouped as disabled diagnostic attributes.
+
+    Address, coordinates and the house identifier are never attributes.
+    """
     coordinator = coordinator_with_status()
     coordinator.data.devices[SERIAL] = replace(
         coordinator.data.devices[SERIAL],
@@ -243,10 +246,6 @@ def test_house_sensor_exposes_complete_topology_metadata() -> None:
 
     assert entity.native_value == "Home"
     assert entity.extra_state_attributes == {
-        "house_id": 10,
-        "address": "Test street 1",
-        "latitude": 50.1,
-        "longitude": 8.4,
         "timezone": 2,
         "iana_timezone": "Europe/Berlin",
         "devices_count": 2,
