@@ -6,6 +6,31 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+- Hybrid data model: every value available from both sources has a cloud
+  variant, a local variant and an effective value that prefers the local one
+  while it is fresh. The integration creates one hub per entry, which the
+  coordinator feeds after every poll (also unchanged ones) together with
+  request health, and which a 10 s timer ages.
+- Local UDP reception of the broadcasts of the units, with the options "Local
+  UDP reception" (automatic, on, off; automatic probes for up to 60 s in the
+  background and remembers the result) and "Create raw source variants". A
+  UDP-detected change asks the cloud for confirmation at most every 30 s.
+  Port or reception problems in mode "on" raise a repair issue with the
+  network requirements (HAOS/Supervised, Docker host network, VLAN broadcast
+  forwarding); it resolves itself when frames arrive.
+- New entities per unit: power, running, physical direction, physical fan
+  stage, zone coupling, last seen, last local frame and the diagnostic data
+  source; disabled by default: the `_cloud`/`_local` variants and the heartbeat
+  age. New "Ambientika cloud" device with cloud reachability and request health
+  diagnostics. Controls and selects keep following the cloud setting.
+- The device placement is cached in `.storage` so local frames can be mapped
+  before the first poll; the cache is removed with the config entry.
+- Diagnostics include hub and listener counters (serials masked, no house id,
+  no addresses).
+- Local power only claims "on" for moving air or a non-idle coupling (an idle
+  unit in Away mode is not shown as off); the physical fan stage is unknown
+  while the unit is idle. Volatile values no longer notify when only the
+  winning source of "last seen" changes.
 - Merge commands for one unit that arrive together (for example mode and
   humidity target in a scene) into a single cloud request, based on the last
   known state plus commands not yet confirmed. Add the action

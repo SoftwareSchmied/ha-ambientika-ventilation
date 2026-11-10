@@ -68,6 +68,8 @@ the Ambientika cloud.
 - Schedule status/control and read-only weekly time-slot details when available
 - Temperature, humidity, air quality, filter state, alarms, and schedule state
 - Optional diagnostic entities for topology, firmware, role, and installation data
+- Optional local data: the UDP broadcasts of the units add the physical
+  direction, fan stage and coupling within seconds, with the cloud as fallback
 - Partial-failure handling, rate-limit backoff, and last-good-value retention
 - Privacy-preserving diagnostics and complete English/German translations
 
@@ -140,6 +142,44 @@ where the app enables them. Manual controls are locked while a weekly schedule
 is active and while the filter status is `Bad`; schedule deactivation and filter
 reset remain available. The two airflow-direction modes are offered only for
 non-Gemini units, while Gemini units also omit Away mode.
+
+## Local data
+
+The master of every zone broadcasts its physical state (zone coupling,
+airflow direction, fan stage) on the local network every 27 seconds and
+immediately on every change. The integration listens passively to these UDP
+frames (UDP port 45000 plus the zone index, one per zone; nothing is sent) and combines them
+with the cloud values:
+
+- For power, running and last seen, every unit has an **effective** entity,
+  which prefers the local value while it is fresh and falls back to the cloud.
+  Disabled variants `... (Cloud)` and `... (local)` show the raw sources.
+- New entities: physical direction, physical fan stage, zone coupling,
+  running, last local frame, and a diagnostic data source (`local_udp`,
+  `cloud`, `degraded`, `offline`). The heartbeat age is available, disabled.
+- The fan, its presets and the selects always follow the setting reported by
+  the cloud and your last command, never the broadcast. An idle unit in Away
+  mode therefore stays "on".
+- A physical change seen locally asks the cloud for confirmation at most once
+  every 30 seconds. If the cloud is unreachable, the local values keep the
+  state of the unit current (data source `degraded`).
+- Cloud health (reachable, consecutive failures, success rate, latency) is
+  shown on an extra "Ambientika cloud" device.
+
+Options (**Settings → Devices & services → Ambientika → Configure**):
+
+| Option | Values | Effect |
+| --- | --- | --- |
+| Local UDP reception | Automatic (default), On, Off | Automatic listens for up to 60 seconds after each start and only keeps listening if broadcasts of your own units arrive (the result is remembered, an unsuccessful probe is repeated at the next restart). On always listens and creates a repair issue if a port cannot be opened or nothing arrives for five minutes; the issue disappears when frames arrive. Off never listens. |
+| Create raw source variants | Off (default) | Enables the `... (Cloud)` and `... (local)` entities. |
+
+Network requirements: the broadcasts must reach Home Assistant. Home Assistant
+OS and Supervised work without changes. A Docker container needs
+`network_mode: host`. Units in another VLAN or subnet need broadcast
+forwarding (for example a UDP broadcast relay or a router rule). The
+integration works with the cloud alone if no broadcast arrives. Diagnostics
+list counters only, without house ids or addresses. See
+[docs/ENTITIES.md](docs/ENTITIES.md) for all entities.
 
 ## Reliability and cloud usage
 

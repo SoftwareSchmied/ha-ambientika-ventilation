@@ -108,8 +108,14 @@ per-entity timers.
   local change.
 - Notifications are sent only when the effective value, the source, the
   availability or a raw variant changes. Identical heartbeats notify nothing.
-  Volatile values (`last_seen`, `heartbeat_age`) notify only on availability
-  or source changes.
+  Volatile values (`last_seen`, `heartbeat_age`) notify only when they become
+  available or unavailable; their entities write at most once per 60 s.
+- Local `power` claims "on" only for a moving direction or a non-idle
+  coupling. An idle frame makes no claim (`None`), because a unit in Away mode
+  idles locally for long periods while it is on; the effective value then
+  falls back to expected or cloud.
+- `physical_stage` is `None` while the unit is idle or stopped with idle
+  coupling, because the frame keeps the last stage while the unit is off.
 
 ### Per-device data source
 
@@ -117,19 +123,51 @@ per-entity timers.
 `degraded` (only one of the two sources works although both were expected,
 for example a cloud outage while UDP still flows) or `offline`.
 
-### Planned entity schema
+### Entity schema
 
-- The effective entity keeps the existing unique ID `<serial>_<key>`, so
-  history and automations survive.
+- The effective entity keeps the unique ID `<serial>_<key>`, so history and
+  automations survive.
 - For datapoints with `has_variants` (`power`, `running`, `last_seen`) the
-  variants `<serial>_<key>_cloud` and `<serial>_<key>_local` are created
-  disabled by default; an option enables them.
-- Local-only datapoints (direction, physical stage, coupling, heartbeat age,
-  local link) and the diagnostic `data_source` are normal entities.
-- The attribute `source` is recorded; `age_s` must not be recorded.
+  variants `<serial>_<key>_cloud` and `<serial>_<key>_local` always exist but
+  are disabled by default. The option "Create raw source variants" enables
+  them in the entity registry before the platforms load (no reload needed).
+- Local-only datapoints (direction, physical stage, coupling, heartbeat age)
+  and the diagnostic `data_source` are normal entities.
+- The attribute `source` is recorded (few distinct values); `age_s` is listed
+  in `_unrecorded_attributes`.
+- Hub-backed entities (`AmbientikaHubEntity`, `entity.py`) subscribe with
+  `hub.subscribe()` and write state only from the callback, never from
+  coordinator updates. Volatile entities add a 60 s timer.
+- The cloud health (`CloudHealth`) is shown by entities of a separate
+  account-level service device (identifier `cloud_<entry id>`).
 
+### Wiring
+
+- `__init__.py` creates one `AmbientikaHub` per entry (`runtime_data.hub`,
+  `cloud_ttl_s = max(150, 2.5 x scan interval)`) and one 10 s timer calling
+  `hub.evaluate()`.
+- The coordinator feeds the hub after every successful poll, also an unchanged
+  one (`update_cloud`, with offline devices counted as failed) and passes the
+  `CloudHealth` built from the request metrics. A failed poll only updates the
+  health.
+- Commands: `_async_execute_write` calls `hub.set_expected()` (60 s) before the
+  request and `clear_expected()` when the cloud rejects it. Controls keep
+  reading the coordinator data (cloud plus written values), never UDP.
+- `local_manager.AmbientikaLocal` owns one `AmbientikaUdpListener` per house id
+  of the topology, feeds `hub.update_local()`, asks the coordinator for a
+  refresh at most every 30 s after a UDP-detected change, runs the automatic
+  probe and raises the repair issues.
+- Reception mode (option `local_udp`): `off` never listens; `on` always
+  listens and raises a repair issue when a port cannot be bound or no frame
+  arrives for 5 minutes (resolved by the first frame); `auto` runs `probe()`
+  for up to 60 s in the background after setup and keeps the listener only if
+  frames with the account's house id arrive. The result is stored; without
+  detection the next restart probes again.
 ### Persistence
 
 `export_topology()` / `import_topology()` exchange plain dictionaries (device
-serial, house, zone index, role, type) for a Home Assistant `Store`, so UDP
-frames can be mapped to devices before the first cloud poll.
+serial, house, zone index, role, type) for a Home Assistant `Store`
+(`.storage/ambientika_ventilation.<entry id>`, together with the last probe
+result), so UDP frames can be mapped to devices before the first cloud poll.
+The topology is imported at start and saved (delayed) when it changes; the
+file is removed with the config entry.
